@@ -552,9 +552,9 @@ function updateBadges() {
 }
 
 /* ══════════════════════════════════════════════
-   ENRICHMENT ENGINE
-   Style : Senior HSE Auditor — Industrial Audit Report
-   Standards : Factories Act 1948, NBC 2016, IS Codes, PESO, EPA 1986
+   ENRICHMENT ENGINE v2.0 (Smart Offline NLP)
+   Features: Risk-Priority Traffic Cop, Grammar Sanitizer, 
+   Targeted Excel Legal Database Search
    ══════════════════════════════════════════════ */
 const E = (() => {
   const PARAMS = ['Electrical Safety','Fire Protection','Mechanical Integrity','Civil & Structural',
@@ -562,230 +562,177 @@ const E = (() => {
     'Ergonomics & Manual Handling','Emergency Preparedness','Working at Height','Permit to Work',
     'Confined Space','HSE Management System','Contractor Safety','Road & Traffic Safety'];
 
+  /* ── 1. Targeted Legal Database (Mapped from Excel) ── */
   const LEGAL_DB = {
-    'Electrical Safety': [
-      'Factories Act, 1948 – Section 36 & Section 36A; IS 732:1989 – Code of Practice for Electrical Wiring Installations; IS 3043:2018 – Code of Practice for Earthing; Central Electricity Authority (Safety) Regulations, 2010 – Regulation 29 & 30',
-      'IE Rules, 1956 – Rule 50 & 51 (Earthing); IS 694:2010 – PVC Insulated Cables; NBC 2016 Part 8 – Building Services (Electrical); Factories Act, 1948 – Section 36 & Schedule III',
-      'Factories Act, 1948 – Section 36; IS 5216 (Parts 1 & 2) – Safety Procedures for Electrical Installations; IS 3043:2018 – Earthing; Central Electricity Authority (Safety) Regulations, 2010'
-    ],
-    'Fire Protection': [
-      'Factories Act, 1948 – Section 38 (Precautions in case of fire); NBC 2016 Part 4 – Fire and Life Safety; IS 2190:2010 – Selection, Installation and Maintenance of First-Aid Fire Extinguishers',
-      'NBC 2016 Part 4 – Fire Protection; IS 15105:2002 – Design and Installation of Fixed Automatic Sprinkler Systems; Petroleum Act, 1934; TAC Fire Protection Manual',
-      'Factories Act, 1948 – Section 38 & 39; IS 1641:1988 – Code of Practice for Fire Safety of Buildings; PESO Guidelines for Storage of Flammable Materials; IS 13947 – LV Switchgear & Control Gear'
-    ],
-    'Mechanical Integrity': [
-      'Factories Act, 1948 – Section 21 (Fencing of machinery) & Section 22 (Work on or near machinery in motion); IS 13871:1993 – Safety of Machinery; IS 11016:1984 – Specification for Machine Guards',
-      'Factories Act, 1948 – Section 29 (Lifting machines, chains, ropes and lifting tackle) & Section 30 (Revolving machinery); IS 3177:2009 – Code of Practice for EOT Cranes; BOCW Act, 1996 – Schedule III',
-      'Factories Act, 1948 – Section 31 (Pressure plant); The Boilers Act, 1923; IS 2825:1969 – Code of Unfired Pressure Vessels; IS 7938:1976 – Code of Practice for Maintenance of Industrial Equipment'
-    ],
-    'Civil & Structural': [
-      'Factories Act, 1948 – Section 33 & Section 16; NBC 2016 Part 6 – Structural Design; IS 456:2000 – Code of Practice for Plain and Reinforced Concrete; BOCW Act, 1996',
-      'BOCW Act, 1996 & Central Rules, 1998 – Rule 67 (Scaffolding); IS 3696 (Parts 1 & 2) – Safety Code for Scaffolds and Ladders; NBC 2016 Part 4 Section 4 – Means of Egress',
-      'Factories Act, 1948 – Section 33A; IS 4130:1991 – Demolition of Buildings – Code of Safety; NBC 2016 Part 3 – Development Control Rules and General Building Requirements'
-    ],
-    'Housekeeping & Order': [
-      'Factories Act, 1948 – Section 11 (Cleanliness), Section 12 (Disposal of wastes and effluents) & Section 14 (Ventilation and temperature); IS 14489:1998 – Code of Practice on OH&S Audit',
-      'Factories Act, 1948 – Section 11 & Section 42 (Facilities for washing); ISO 45001:2018 – Clause 8.1 (Operational Planning and Control); IS 14489:1998 – OH&S Audit',
-      'Factories Act, 1948 – Section 11 (Cleanliness) & Section 16 (Precautions against fire); NBC 2016 – General Building Requirements; IS 9672:1980 – Code of Practice for Storage of Petroleum Products'
-    ],
-    'PPE Compliance': [
-      'Factories Act, 1948 – Section 35 (Protection of eyes) & Model Factory Rules – Rule 65; IS 4151:2015 – Protective Helmets; IS 15071:2002 – Safety Footwear; IS 6519:1971 – Safety Harnesses',
-      'Factories Act, 1948 – Section 35 & Section 87 (Dangerous operations); IS 14255:2016 – High Visibility Vests; IS 9167:1979 – Ear Protectors; IS 5983:1980 – Eye Protectors',
-      'Factories Act, 1948 – Section 35; Model Rules – Rule 65 & 66; IS 4151:2015 – Industrial Safety Helmets; IS 15071:2002 – Safety Footwear; Mines Act, 1952 – Section 22 & 23'
-    ],
-    'Environmental Control': [
-      'Environment Protection Act, 1986 – Section 7 (Persons handling hazardous substances); Environment Protection Rules, 1986 – Rule 3 & 5; Hazardous Waste (Management, Handling and Transboundary Movement) Rules, 2008',
-      'Water (Prevention and Control of Pollution) Act, 1974; Air (Prevention and Control of Pollution) Act, 1981; Environment Protection Act, 1986 – Schedule I (Standards for Emission or Discharge)',
-      'Hazardous Waste (Management) Rules, 2016; Environment Protection Act, 1986 – Section 6 & 7; ISO 14001:2015 – Clause 6.1.2 (Environmental Aspects); Factories Act, 1948 – Section 12'
-    ],
-    'Chemical & Hazmat Management': [
-      'Manufacture, Storage and Import of Hazardous Chemical Rules, 1989 – Rule 4 & 5; PESO Regulations; Factories Act, 1948 – Section 41B (Compulsory disclosure of information)',
-      'Static and Mobile Pressure Vessels (Unfired) Rules, 1981; PESO – Gas Cylinder Rules, 2016; Explosives Act, 1884; Petroleum Act, 1934 & Petroleum Rules, 2002; Factories Act, 1948 – Section 36',
-      'Manufacture, Storage and Import of Hazardous Chemical Rules, 1989; Public Liability Insurance Act, 1991; Environment Protection Act, 1986; IS 1446:1985 – Safety Colours and Safety Signs'
-    ],
-    'Ergonomics & Manual Handling': [
-      'Factories Act, 1948 – Section 33 (Excessive weights) & Section 34; IS 14056:2013 – Manual Handling of Loads; IS 13388:1992 – Ergonomic Guidelines for Visual Display Terminals',
-      'Factories Act, 1948 – Section 33 & Model Rules – Rule 56 (Precautions against excessive weights); ISO 11228-1:2003 – Ergonomics – Manual Handling; IS 14489:1998 – OH&S Audit Guidelines',
-      'Factories Act, 1948 – Section 33; BOCW Act, 1996 – Schedule III; IS 14056:2013 – Code of Practice on Manual Handling; Model Rules under the Factories Act – Chapter III'
-    ],
-    'Emergency Preparedness': [
-      'Factories Act, 1948 – Section 41B (Disaster Management Plan) & Section 45 (First-Aid); Model Rules – Rule 73 (First-Aid Appliances); Disaster Management Act, 2005',
-      'Factories Act, 1948 – Section 41B & 41C (Emergency planning); IS 15656:2006 – Hazard Identification and Risk Analysis; NBC 2016 Part 4 – Fire Escape and Emergency Evacuation',
-      'Factories Act, 1948 – Section 45 & 46 (First-Aid); IS 15656:2006 – HIRA; BOCW Act, 1996 – Rule 225; NBC 2016 – Clause 5 (Means of Egress & Emergency Lighting)'
-    ],
-    'Working at Height': [
-      'Factories Act, 1948 – Section 33A & Model Rules – Rule 65(A); BOCW Act, 1996 & Central Rules, 1998 – Rule 67 (Scaffolding); IS 3696 (Part 1):1987 – Safety Code for Scaffolds; IS 3696 (Part 2):1991 – Safety Code for Ladders',
-      'BOCW Act, 1996 – Rule 70; IS 6519:1971 – Code of Practice for Safety Belts & Harnesses; NBC 2016 Part 4 – Section 4 (Fall Protection); Factories Act, 1948 – Section 33A',
-      'Factories Act, 1948 – Section 33A; BOCW Central Rules, 1998 – Rule 67 & 68; IS 3696 – Scaffolds and Ladders (Safety Code); IS 6519:1971 – Safety Harnesses'
-    ],
-    'Permit to Work': [
-      'Factories Act, 1948 – Section 36A (Precautions against dangerous fumes); IS 15656:2006 – Hazard Identification & Risk Analysis; OISD Standard 105 – Work Permit System',
-      'Factories Act, 1948 – Section 41B; OISD Standard 105 – Work Permit System; IS 15656:2006 – HIRA; Model Rules – Hot Work, Confined Space and Electrical Isolation Procedures',
-      'Factories Act, 1948 – Section 38 & 36A; OISD Standard 105; IS 14489:1998 – OH&S Audit; Model Rules – Chapter VII (Hazardous Process Rules)'
-    ],
-    'Confined Space': [
-      'Factories Act, 1948 – Section 36A (Precautions against dangerous fumes and gases); OISD Standard 105 (Confined Space Entry); Model Factory Rules – Rule 113 & 114 (Entry into Confined Spaces)',
-      'Factories Act, 1948 – Section 36A; IS 15656:2006 – HIRA; Model Factory Rules – Rule 113 (Certificate before Entry); OISD Standard 105 – Permit to Work',
-      'Factories Act, 1948 – Section 36 & 36A; OISD Standard 105 – Confined Space Entry; IS 16024:2012 – Safety Requirements for Electrical Equipment; Model Rules – Chapter on Confined Spaces'
-    ],
-    'HSE Management System': [
-      'Factories Act, 1948 – Section 7A (General duties of the occupier) & Section 40B (Safety Officers); IS 14489:1998 – Code of Practice on OH&S Audit; ISO 45001:2018 – Clause 9.2 (Internal Audit)',
-      'Factories Act, 1948 – Section 40B & Section 41 (Power to require specifications); IS 14489:1998 – OH&S Audit; ISO 45001:2018 – Clause 10.3 (Continual Improvement)',
-      'Factories Act, 1948 – Section 7A & 41; National Policy on Safety, Health and Environment at Workplace, 2009; ISO 45001:2018 – Clause 6.1 (Risks and Opportunities); IS 15656:2006 – HIRA'
-    ],
-    'Contractor Safety': [
-      'Factories Act, 1948 – Section 41B; Contract Labour (Regulation and Abolition) Act, 1970; BOCW Act, 1996 – Chapter III (Safety, Health & Welfare of Workers)',
-      'Contract Labour (Regulation and Abolition) Act, 1970; Factories Act, 1948 – Section 7A; BOCW Act, 1996 & Central Rules, 1998 – Rule 25 (Safety Measures); ISO 45001:2018 – Clause 8.1.4',
-      'Factories Act, 1948 – Section 41B; Contract Labour Act, 1970; BOCW Act, 1996; IS 14489:1998 – OH&S Audit; NBC 2016 Part 7 – Constructional Practices and Safety'
-    ],
-    'Road & Traffic Safety': [
-      'Motor Vehicles Act, 1988 – Section 112 & 113; Central Motor Vehicles Rules, 1989; IS 17076:2019 – Road Safety Audit; Factories Act, 1948 – Section 33A',
-      'Motor Vehicles Act, 1988; Factories Act, 1948 – Section 33A; IS 4082:1996 – Stacking and Storage; OISD Standard 173 – Road Safety in the Petroleum Industry',
-      'Motor Vehicles Act, 1988 – Section 112; IS 17076:2019 – Road Safety Audit; Factories Act, 1948 – Section 7A; OISD Standard 173 – Road Safety Guidelines'
-    ]
+    'Electrical Safety': {
+      keywords: {
+        'earth': 'IS 3043:2018 – Code of Practice for Earthing',
+        'cable': 'IS 694:2010 – PVC Insulated Cables for working voltages up to 1100V',
+        'wiring': 'IS 732:2019 – Code of Practice for Electrical Wiring Installations',
+        'conduit': 'IS 9537 – Conduits for Electrical Installations',
+        'fuse': 'IS 13703 – HRC Cartridge Fuse Links up to 650V',
+        'mcb': 'IS 8828 / IS/IEC 60898 – Miniature Circuit Breakers',
+        'elcb': 'IS 12640 – Residual Current Operated Circuit Breakers (RCCB/ELCB)',
+        'switchgear': 'IS/IEC 60947 – Low-Voltage Switchgear and Controlgear',
+        'panel': 'IS 8623 – Factory Built Assemblies of Switchgear & Controlgear',
+        'transformer': 'CEA (Safety & Electric Supply) Regulations, 2010 – Reg. 38',
+        'danger': 'IS 2551 – Danger Notice Plates',
+        'loto': 'IS 5216 (Part 1):1982 – Safety Procedures & Practices in Electrical Work',
+        'shock': 'CEA (Safety & Electric Supply) Regulations, 2010 – Reg. 43',
+        'clearance': 'CEA (Safety & Electric Supply) Regulations, 2010 – Reg. 64'
+      },
+      default: 'Factories Act, 1948 – Section 36 (Precautions regarding electrical hazards)'
+    },
+    'Contractor Safety': {
+      keywords: {
+        'amenities': 'Contract Labour (R&A) Act, 1970 – Sections 16–18 (Welfare amenities)',
+        'induction': 'Factories Act, 1948 – Section 7A + IS/ISO 45001:2018 Cl. 7.2',
+        'wages': 'Code on Wages, 2019 / Contract Labour (R&A) Central Rules, 1971'
+      },
+      default: 'Contract Labour (Regulation & Abolition) Act, 1970'
+    },
+    'Road & Traffic Safety': {
+      keywords: {
+        'speed': 'Motor Vehicles Act, 1988 – Section 112 (Limits of speed)',
+        'seatbelt': 'Central Motor Vehicles Rules, 1989 – Rule 125 (Seat belts)',
+        'helmet': 'Motor Vehicles Act, 1988 – Section 129 (Protective headgear)',
+        'license': 'Motor Vehicles Act, 1988 – Section 3 (Necessity for driving licence)',
+        'signage': 'IRC:67-2012 – Code of Practice for Road Signs',
+        'marking': 'IRC:35-2015 – Code of Practice for Road Markings',
+        'pedestrian': 'IRC:103-2012 – Guidelines for Pedestrian Facilities',
+        'reverse': 'Central Motor Vehicles Rules, 1989 – Rule 119 (Audible warning / horn)',
+        'forklift': 'Factories Act, 1948 – Section 29'
+      },
+      default: 'Motor Vehicles Act, 1988'
+    },
+    'Working at Height': { keywords: { 'scaffold': 'BOCW Central Rules, 1998 – Rule 67 (Scaffolding)', 'harness': 'IS 6519:1971 – Code of Practice for Safety Harnesses', 'ladder': 'IS 3696 (Part 2):1991 – Safety Code for Ladders', 'roof': 'Factories Act, 1948 – Section 32' }, default: 'Factories Act, 1948 – Section 33A' },
+    'Fire Protection': { keywords: { 'extinguish': 'IS 2190:2010 – Selection and Maintenance of Fire Extinguishers', 'sprinkler': 'IS 15105:2002 – Automatic Sprinkler Systems' }, default: 'Factories Act, 1948 – Section 38 (Precautions in case of fire)' },
+    
+    // Generic Defaults for remaining categories (You can expand these later)
+    'HSE Management System': { keywords: {}, default: 'Factories Act, 1948 – Section 7A (General duties of the occupier)' },
+    'Mechanical Integrity': { keywords: {}, default: 'Factories Act, 1948 – Section 21 (Fencing of machinery)' },
+    'Civil & Structural': { keywords: {}, default: 'Factories Act, 1948 – Section 33 (Pits, sumps, openings in floors, etc.)' },
+    'Housekeeping & Order': { keywords: {}, default: 'Factories Act, 1948 – Section 11 (Cleanliness)' },
+    'PPE Compliance': { keywords: {}, default: 'Factories Act, 1948 – Section 35 (Protection of eyes) & Model Factory Rules' },
+    'Environmental Control': { keywords: {}, default: 'Environment Protection Act, 1986' },
+    'Chemical & Hazmat Management': { keywords: {}, default: 'Manufacture, Storage and Import of Hazardous Chemical Rules, 1989' },
+    'Ergonomics & Manual Handling': { keywords: {}, default: 'Factories Act, 1948 – Section 34 (Excessive weights)' },
+    'Emergency Preparedness': { keywords: {}, default: 'Factories Act, 1948 – Section 41B (Disaster Management Plan)' },
+    'Permit to Work': { keywords: {}, default: 'IS 15656:2006 – Hazard Identification & Risk Analysis; OISD Standard 105' },
+    'Confined Space': { keywords: {}, default: 'Factories Act, 1948 – Section 36A (Precautions against dangerous fumes)' }
   };
 
-  /* ── Observation templates: formal industrial audit language per prompt ── */
-  const REFINED = {
-    Critical: [
-      'During the inspection of the subject area, it was observed that {obs}. The said condition poses an immediate and life-threatening risk to personnel in the vicinity, with the potential to result in fatality, serious injury, fire, explosion, or electrocution if left unaddressed. The observation is classified as Critical and necessitates immediate stoppage of related activities and emergency corrective intervention prior to resumption of operations.',
-      'It was observed during the walkaround audit that {obs}. This unsafe condition represents a critical non-conformance with statutory safety requirements and exposes personnel to significant hazards. The matter warrants urgent escalation to senior management for immediate closure and a formal Root Cause Analysis to prevent recurrence.',
-      'As verified during the physical inspection, {obs}. The prevailing unsafe condition, if not rectified on an immediate basis, presents a high probability of a major incident including severe injury, fatality, entanglement, or structural failure. The observation is rated Critical and requires emergency corrective action before any further work activity is permitted in the area.'
-    ],
-    High: [
-      'During the inspection, it was observed that {obs}. The said condition represents a high-priority safety deficiency with the potential to result in serious injury, fire, or operational disruption. It is essential that corrective action be initiated within 24 to 48 hours to mitigate the associated risk and prevent escalation to a major incident.',
-      'It was observed during the audit that {obs}. The identified unsafe condition, if not rectified promptly, may lead to personnel injury, equipment damage, or fire hazard. The observation is classified as High severity and requires immediate assignment to a responsible person with a defined target completion date and formal corrective action documentation.',
-      'As informed by the team and verified during inspection, {obs}. This finding reflects a significant gap in safety standards and has the potential to cause harm to personnel through falls, entanglement, electrocution, or exposure to hazardous substances. The management is advised to treat this as a high-priority action and initiate corrective measures without undue delay.'
-    ],
-    Medium: [
-      'During the inspection, it was observed that {obs}. While the condition does not present an immediate life-threatening risk, it reflects a systemic gap in safety management that, if unaddressed, may escalate to a more serious hazard over time. The observation is classified as Medium priority and corrective action is recommended within the agreed timeframe.',
-      'It was observed during the walkaround that {obs}. The said condition is indicative of inadequate maintenance or non-compliance with applicable safety standards. A responsible person should be assigned for corrective action with a defined target date, and closure should be verified through a follow-up inspection with photographic documentation.',
-      'As noted during the audit, {obs}. The observation reflects a moderate safety concern requiring structured corrective action. The management is advised to include this finding in the site HSE action register, assign ownership, and ensure closure within the stipulated timeline with documentary evidence.'
-    ],
-    Low: [
-      'During the inspection, it was observed that {obs}. The condition represents a low-severity observation with limited immediate risk; however, it reflects an area of improvement that, if addressed proactively, will contribute to a safer and more organised work environment. The observation is recommended for inclusion in the routine maintenance schedule.',
-      'It was observed that {obs}. While the associated risk level is low at this time, the management is advised to address this observation as part of continuous improvement initiatives. The relevant supervisor should be briefed, and closure should be verified during the next scheduled walkthrough inspection.',
-      'As noted during the audit, {obs}. This observation is classified as Low priority and is representative of a housekeeping or minor procedural gap. The team is encouraged to take ownership of such observations and resolve them within the normal operational cycle to reinforce a culture of proactive safety management.'
-    ]
-  };
+  /* ── 2. Grammar Sanitizer ── */
+  function sanitizeObservation(text) {
+    let clean = (text || '').trim();
+    clean = clean.replace(/[\.!]+$/, ''); // Strip trailing punctuation
+    // Fix capitalization so it flows into the middle of the sentence
+    if (clean === clean.toUpperCase() || clean === clean.toLowerCase()) {
+      clean = clean.charAt(0).toLowerCase() + clean.slice(1).toLowerCase();
+    } else {
+      clean = clean.charAt(0).toLowerCase() + clean.slice(1);
+    }
+    return clean;
+  }
 
-  /* ── Recommendation templates: realistic, engineering-focused, implementation-oriented ── */
-  const RECS = {
-    Critical: [
-      'It is recommended that the affected area be immediately cordoned off and a Stop Work Notice be issued by the competent authority. An emergency risk assessment shall be conducted, interim engineering controls implemented, and the matter escalated to the Plant Head and HSE Manager forthwith. Permanent corrective action must be completed and independently verified before the area is reopened. A formal Root Cause Analysis (RCA) shall be initiated to determine causal factors and prevent recurrence.',
-      'The management is advised to immediately halt all operations in the affected zone and issue a written Stop Work Authority. A dedicated corrective action team comprising the department head, maintenance engineer, and HSE officer shall be constituted. All personnel shall be briefed through an emergency toolbox talk. Permanent rectification shall be completed under a validated engineering change procedure with photographic evidence of closure submitted to the HSE department.',
-      'It is strongly recommended that work in the affected area be suspended immediately pending corrective action. Temporary barriers and isolation measures shall be implemented within two hours. A detailed RCA using the 5-Why or Fishbone methodology shall be documented. Corrective and Preventive Actions (CAPA) shall be implemented and verified by a competent HSE professional, and the findings shall be shared across all sites as a lessons-learned communication.'
-    ],
-    High: [
-      'It is recommended that the responsible department head immediately assign a competent person for corrective action with a target completion date not exceeding 48 hours. Interim controls shall be deployed without delay. A formal Corrective Action Request (CAR) shall be raised in the site HSE management system, and closure shall be verified through a physical follow-up inspection with photographic documentation submitted to the HSE department.',
-      'The management is advised to deploy interim safeguards such as barricading, hazard warning signage, or temporary isolation within 24 hours. A written corrective action plan shall be prepared by the concerned department, reviewed by the HSE Manager, and implemented within the stipulated period. A re-inspection shall be carried out upon completion to confirm the effectiveness of remedial measures.',
-      'It is recommended that the area supervisor be formally notified and directed to initiate corrective action. The HSE team shall conduct a focused risk assessment for the affected task and develop a revised Safe Work Procedure (SWP) if required. Affected personnel shall be briefed on the hazard and the interim controls in place. Closure must be documented and reported at the next HSE review meeting.'
-    ],
-    Medium: [
-      'It is recommended that the area supervisor be assigned responsibility for corrective action with a defined target date. The finding shall be logged in the site HSE action tracker and progress reviewed at the weekly safety meeting. Closure shall be confirmed through a physical inspection, and photographic evidence of the rectified condition shall be submitted to the HSE department for record-keeping.',
-      'The management is advised to include this observation in the formal HSE action register and assign it to the relevant department with a completion deadline. An awareness session or toolbox talk on the specific hazard shall be conducted for the affected workforce. The HSE officer shall carry out a follow-up inspection within 14 days to verify that corrective measures have been implemented effectively.',
-      'It is recommended that a formal observation card be issued to the area in-charge with clear details of the finding and the required corrective action. The HSE team shall schedule a follow-up inspection at the next audit cycle to verify closure. The observation and its resolution shall be documented in the site HSE management system and included in the monthly safety performance report for management review.'
-    ],
-    Low: [
-      'It is recommended that this observation be included in the routine maintenance schedule and assigned to the area team for resolution within the normal operational cycle. The finding shall be discussed during the next toolbox talk to create awareness among the workforce. The site HSE officer shall verify closure during the next scheduled walkthrough inspection.',
-      'The management is advised to include this observation in the site improvement register and assign it to the area lead for resolution within the standard maintenance timeframe. Improvements of this nature should be encouraged through positive recognition and reinforcement of a proactive safety culture on site.',
-      'It is recommended that the relevant supervisor be informed and that corrective action be scheduled as part of routine operations. The workforce shall be encouraged to self-identify and promptly address similar observations through the site near-miss and unsafe condition reporting programme. Closure shall be confirmed at the next scheduled inspection.'
-    ]
-  };
-
+  /* ── 3. Top-Down Risk Priority Classification ── */
   function classify(obs) {
     obs = (obs || '').toLowerCase();
-    if (/electric|cable|wire|socket|panel|circuit|switch|fuse|earthing|mcb|wiring|busbar/.test(obs)) return 'Electrical Safety';
-    if (/fire|extinguish|smoke|sprinkler|alarm|flame|ignit|hydrant|hose reel/.test(obs)) return 'Fire Protection';
-    if (/machine|equipment|guard|belt|gear|shaft|press|pump|compressor|valve|pressure|coupling|nip point/.test(obs)) return 'Mechanical Integrity';
-    if (/floor|crack|wall|roof|structure|concrete|scaffold|civil|drain|step|stair|railing|handrail/.test(obs)) return 'Civil & Structural';
-    if (/housekeep|clean|clutter|debris|spill|waste|storage|aisle|tidy|litter|blocked/.test(obs)) return 'Housekeeping & Order';
-    if (/ppe|helmet|glove|boot|goggle|vest|harness|mask|respirator|ear|safety wear|apron/.test(obs)) return 'PPE Compliance';
-    if (/environm|emission|effluent|discharge|leak|containment|pollut|sump|bund/.test(obs)) return 'Environmental Control';
-    if (/chemical|hazmat|msds|sds|flammable|corrosive|toxic|gas cylinder|lpg|solvent/.test(obs)) return 'Chemical & Hazmat Management';
-    if (/ergon|manual|lift|carry|posture|repetitive|strain|awkward/.test(obs)) return 'Ergonomics & Manual Handling';
-    if (/height|ladder|scaffold|roof|elevated|fall|edge|opening|skylight|parapet/.test(obs)) return 'Working at Height';
-    if (/permit|ptw|hot work|isolation|lockout|tagout/.test(obs)) return 'Permit to Work';
+    
+    // CRITICAL RISKS (Checked first)
+    if (/electric|cable|wire|socket|panel|circuit|switch|fuse|earthing|mcb|wiring|busbar|transformer|shock|elcb/.test(obs)) return 'Electrical Safety';
+    if (/fire|extinguish|smoke|sprinkler|alarm|flame|ignit|hydrant|hose/.test(obs)) return 'Fire Protection';
     if (/confined|vessel|tank|silo|manhole|pit|trench/.test(obs)) return 'Confined Space';
-    if (/emergency|first aid|evacuation|assembly|muster|rescue|fire exit|exit sign/.test(obs)) return 'Emergency Preparedness';
-    if (/contractor|subcontract/.test(obs)) return 'Contractor Safety';
+    if (/height|ladder|scaffold|roof|elevated|fall|edge|opening|skylight|parapet/.test(obs)) return 'Working at Height';
+    if (/permit|ptw|hot work|isolation|lockout|tagout|loto/.test(obs)) return 'Permit to Work';
+
+    // HIGH RISKS
+    if (/chemical|hazmat|msds|sds|flammable|corrosive|toxic|gas cylinder|lpg|solvent/.test(obs)) return 'Chemical & Hazmat Management';
+    if (/machine|equipment|guard|belt|gear|shaft|press|pump|compressor|valve|pressure|coupling|nip/.test(obs)) return 'Mechanical Integrity';
     if (/vehicle|truck|forklift|driver|traffic|parking|speed|reversing/.test(obs)) return 'Road & Traffic Safety';
+    
+    // MEDIUM RISKS
+    if (/environm|emission|effluent|discharge|leak|containment|pollut|sump|bund/.test(obs)) return 'Environmental Control';
+    if (/floor|crack|wall|structure|concrete|civil|drain|step|stair|railing/.test(obs)) return 'Civil & Structural';
+    if (/emergency|first aid|evacuation|assembly|muster|rescue|exit/.test(obs)) return 'Emergency Preparedness';
+    if (/ppe|helmet|glove|boot|goggle|vest|harness|mask|respirator|ear/.test(obs)) return 'PPE Compliance';
+    
+    // LOWER / SYSTEM RISKS (Checked last)
+    if (/ergon|manual|lift|carry|posture|repetitive|strain|awkward/.test(obs)) return 'Ergonomics & Manual Handling';
+    if (/housekeep|clean|clutter|debris|spill|waste|storage|aisle|tidy|litter|blocked/.test(obs)) return 'Housekeeping & Order';
+    if (/contractor|subcontract/.test(obs)) return 'Contractor Safety';
+    
     return 'HSE Management System';
   }
 
+  /* ── 4. Targeted Database Search Engine ── */
+  function getLegalClause(obsText, category) {
+    const text = (obsText || '').toLowerCase();
+    const dbCategory = LEGAL_DB[category];
+    if (!dbCategory) return LEGAL_DB['HSE Management System'].default;
+
+    for (const [keyword, law] of Object.entries(dbCategory.keywords)) {
+      if (text.includes(keyword)) return law;
+    }
+    return dbCategory.default; 
+  }
+
+  /* ── 5. Templates ── */
+  const REFINED = {
+    Critical: [
+      'During the inspection of the subject area, it was observed that {obs}. The said condition poses an immediate and life-threatening risk to personnel in the vicinity, with the potential to result in fatality, serious injury, fire, explosion, or electrocution if left unaddressed. The observation is classified as Critical and necessitates immediate stoppage of related activities and emergency corrective intervention prior to resumption of operations.',
+      'It was observed during the walkaround audit that {obs}. This unsafe condition represents a critical non-conformance with statutory safety requirements and exposes personnel to significant hazards. The matter warrants urgent escalation to senior management for immediate closure and a formal Root Cause Analysis to prevent recurrence.'
+    ],
+    High: [
+      'During the inspection, it was observed that {obs}. The said condition represents a high-priority safety deficiency with the potential to result in serious injury, fire, or operational disruption. It is essential that corrective action be initiated within 24 to 48 hours to mitigate the associated risk and prevent escalation to a major incident.',
+      'It was observed during the audit that {obs}. The identified unsafe condition, if not rectified promptly, may lead to personnel injury, equipment damage, or fire hazard. The observation is classified as High severity and requires immediate assignment to a responsible person with a defined target completion date and formal corrective action documentation.'
+    ],
+    Medium: [
+      'During the inspection, it was observed that {obs}. While the condition does not present an immediate life-threatening risk, it reflects a systemic gap in safety management that, if unaddressed, may escalate to a more serious hazard over time. The observation is classified as Medium priority and corrective action is recommended within the agreed timeframe.',
+      'It was observed during the walkaround that {obs}. The said condition is indicative of inadequate maintenance or non-compliance with applicable safety standards. A responsible person should be assigned for corrective action with a defined target date, and closure should be verified through a follow-up inspection with photographic documentation.'
+    ],
+    Low: [
+      'During the inspection, it was observed that {obs}. The condition represents a low-severity observation with limited immediate risk; however, it reflects an area of improvement that, if addressed proactively, will contribute to a safer and more organised work environment. The observation is recommended for inclusion in the routine maintenance schedule.',
+      'It was observed that {obs}. While the associated risk level is low at this time, the management is advised to address this observation as part of continuous improvement initiatives. The relevant supervisor should be briefed, and closure should be verified during the next scheduled walkthrough inspection.'
+    ]
+  };
+
+  const RECS = {
+    Critical: [
+      'It is recommended that the affected area be immediately cordoned off and a Stop Work Notice be issued by the competent authority. An emergency risk assessment shall be conducted, interim engineering controls implemented, and the matter escalated to the Plant Head and HSE Manager forthwith. Permanent corrective action must be completed and independently verified before the area is reopened. A formal Root Cause Analysis (RCA) shall be initiated to determine causal factors and prevent recurrence.',
+      'The management is advised to immediately halt all operations in the affected zone and issue a written Stop Work Authority. A dedicated corrective action team comprising the department head, maintenance engineer, and HSE officer shall be constituted. All personnel shall be briefed through an emergency toolbox talk. Permanent rectification shall be completed under a validated engineering change procedure with photographic evidence of closure submitted to the HSE department.'
+    ],
+    High: [
+      'It is recommended that the responsible department head immediately assign a competent person for corrective action with a target completion date not exceeding 48 hours. Interim controls shall be deployed without delay. A formal Corrective Action Request (CAR) shall be raised in the site HSE management system, and closure shall be verified through a physical follow-up inspection with photographic documentation submitted to the HSE department.',
+      'The management is advised to deploy interim safeguards such as barricading, hazard warning signage, or temporary isolation within 24 hours. A written corrective action plan shall be prepared by the concerned department, reviewed by the HSE Manager, and implemented within the stipulated period.'
+    ],
+    Medium: [
+      'It is recommended that the area supervisor be assigned responsibility for corrective action with a defined target date. The finding shall be logged in the site HSE action tracker and progress reviewed at the weekly safety meeting. Closure shall be confirmed through a physical inspection, and photographic evidence of the rectified condition shall be submitted to the HSE department for record-keeping.',
+      'The management is advised to include this observation in the formal HSE action register and assign it to the relevant department with a completion deadline. An awareness session or toolbox talk on the specific hazard shall be conducted for the affected workforce.'
+    ],
+    Low: [
+      'It is recommended that this observation be included in the routine maintenance schedule and assigned to the area team for resolution within the normal operational cycle. The finding shall be discussed during the next toolbox talk to create awareness among the workforce. The site HSE officer shall verify closure during the next scheduled walkthrough inspection.',
+      'The management is advised to include this observation in the site improvement register and assign it to the area lead for resolution within the standard maintenance timeframe.'
+    ]
+  };
+
   function pick(arr, i, v) { return arr[(i + v) % arr.length]; }
 
+  /* ── 6. Final Execution ── */
   function enrich(r, i, v) {
     const sev = r.severity || 'Medium';
-    const refined = pick(REFINED[sev] || REFINED.Medium, i, v).replace('{obs}', r.observation || '—');
-    const recommendation = pick(RECS[sev] || RECS.Medium, i, v);
     const param = r.parameter || classify(r.observation);
-    const legal = pick(LEGAL_DB[param] || LEGAL_DB['HSE Management System'], i, v);
+    
+    const cleanObs = sanitizeObservation(r.observation);
+    const refined = pick(REFINED[sev] || REFINED.Medium, i, v).replace('{obs}', cleanObs);
+    const recommendation = pick(RECS[sev] || RECS.Medium, i, v);
+    const legal = getLegalClause(r.observation, param);
+    
     return { refined, recommendation, legal };
   }
 
   return { classify, enrich, PARAMS };
 })();
-
-/* ══ Enrich ══ */
-function enrichRow(i) {
-  const r = rows[i];
-  if (!r.parameter) r.parameter = E.classify(r.observation);
-  const e = E.enrich(r, i, seed + (r._v || 0));
-  r.refined = e.refined; r.recommendation = e.recommendation; r.legal = e.legal;
-}
-
-async function enrichAll() {
-  if (!rows.length) { toast('No findings to enrich.', 'warn'); return; }
-  document.getElementById('enrichBanner').classList.add('show');
-  document.getElementById('btnEnrichAll').disabled = true;
-  await new Promise(r => setTimeout(r, 0));
-  rows.forEach((_, i) => enrichRow(i));
-  await new Promise(r => setTimeout(r, 50));
-  document.getElementById('enrichBanner').classList.remove('show');
-  document.getElementById('btnEnrichAll').disabled = false;
-  persist(); renderTable(); renderDashboard();
-  toast(`Enriched ${rows.length} finding${rows.length !== 1 ? 's' : ''}.`, 'ok');
-}
-
-function rerollAll() {
-  if (!rows.length) { toast('No findings to re-vary.', 'warn'); return; }
-  seed++; rows.forEach(r => { if (r.refined) { r._v = 0; const i = rows.indexOf(r); enrichRow(i); } });
-  persist(); renderTable();
-  toast('Re-varied all wording.');
-}
-function rerollSingle(i) { rows[i]._v = (rows[i]._v || 0) + 1; enrichRow(i); persist(); renderTable(); }
-
-function addRow() {
-  rows.push({ id: 'F' + String(rows.length + 1).padStart(3,'0'), location: '', department: '', category: 'Other',
-    findingType: 'Unsafe Condition', severity: 'Medium', observation: '', responsiblePerson: '',
-    targetDate: '', actionRequired: '', status: 'Open', photos: [], timestamp: new Date().toISOString(),
-    parameter: 'HSE Management System', refined: '', recommendation: '', legal: '', _v: 0, likelihood: 3, consequence: 3 });
-  persist(); renderAll();
-}
-
-/* ══ Filter ══ */
-function filteredRows() {
-  const s = (document.getElementById('fltSearch').value || '').toLowerCase();
-  const sev = document.getElementById('fltSev').value;
-  const status = document.getElementById('fltStatus').value;
-  return rows.filter(r =>
-    (!s || (r.location||'').toLowerCase().includes(s) || (r.observation||'').toLowerCase().includes(s)) &&
-    (!sev || r.severity === sev) && (!status || r.status === status)
-  );
-}
-['fltSearch','fltSev','fltStatus'].forEach(id => {
-  const el = document.getElementById(id);
-  el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => renderTable());
-});
-
-function delRow(i) { rows.splice(i, 1); persist(); renderAll(); toast('Row deleted.'); }
-function upd(i, k, v) { rows[i][k] = v; if (['observation','severity','parameter','location'].includes(k)) { const r = rows[i]; if (r.refined) enrichRow(i); } persist(); renderKPIs(); }
-function updSev(i, sel) { upd(i, 'severity', sel.value); sel.className = 'sev-' + sel.value; renderKPIs(); }
-function updSt(i, sel) { rows[i].status = sel.value; sel.className = 'st-' + sel.value.replace(' ',''); persist(); renderKPIs(); }
-
-/* ══ Render all ══ */
-function renderAll() { renderKPIs(); renderTable(); updateBadges(); renderDashboard(); }
 
 /* ══ KPIs ══ */
 function renderKPIs() {
@@ -1144,26 +1091,41 @@ async function exportStage1Excel() {
   toast('Building Stage 1 Excel…');
   const wb=new ExcelJS.Workbook(); wb.creator='SnapAudit'; wb.created=new Date();
   const ws=wb.addWorksheet('Stage 1 – Field Capture',{tabColor:{argb:'FF183934'}});
-  ws.columns=[{header:'ID',key:'id',width:10},{header:'Timestamp',key:'ts',width:22},{header:'Location',key:'loc',width:35},{header:'Observation',key:'obs',width:60},{header:'Photos',key:'ph',width:12}];
+  
+  // 1. Updated width for Photo column
+  ws.columns=[{header:'ID',key:'id',width:10},{header:'Timestamp',key:'ts',width:22},{header:'Location',key:'loc',width:35},{header:'Observation',key:'obs',width:60},{header:'Photo',key:'ph',width:24}];
+  
   const hf={type:'pattern',pattern:'solid',fgColor:{argb:'FF183934'}};
   ws.getRow(1).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle'};});
   ws.getRow(1).height=22;
-  rows.forEach(r=>{const row=ws.addRow({id:r.id,ts:r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'',loc:r.location||'',obs:r.observation||'',ph:(r.photos&&r.photos.length)||0});row.alignment={wrapText:true,vertical:'top'};row.height=32;});
+  
+  rows.forEach((r, idx)=>{
+    const rowNum = idx + 2;
+    // 2. Pass empty string for the photo cell
+    const row=ws.addRow({id:r.id,ts:r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'',loc:r.location||'',obs:r.observation||'',ph:''});
+    row.alignment={wrapText:true,vertical:'top'};
+    
+    // 3. Set row height to hold the image
+    row.height=90;
+    
+    // 4. Image Stitching Engine
+    if (r.photos && r.photos[0]) {
+      const base64Data = r.photos[0].replace(/^data:image\/\w+;base64,/, "");
+      const imageId = wb.addImage({ base64: base64Data, extension: 'jpeg' });
+      ws.addImage(imageId, {
+        tl: { col: 4, row: rowNum - 1 }, // Anchors to column E (index 4)
+        ext: { width: 150, height: 105 },
+        editAs: 'oneCell'
+      });
+    }
+  });
+  
   ws.autoFilter={from:'A1',to:'E1'};
   const buf=await wb.xlsx.writeBuffer();
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   a.download=`SnapAudit-Stage1-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();
   toast('Stage 1 Excel saved.','ok');
 }
-
-function exportStage1JSON() {
-  if(!rows.length){toast('No findings to export.','warn');return;}
-  const payload={version:'snapaudit-v1',stage:1,meta,exportedAt:new Date().toISOString(),findings:rows.map(r=>({id:r.id,timestamp:r.timestamp,location:r.location,observation:r.observation,photos:r.photos||[]}))};
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
-  a.download=`SnapAudit-Stage1-${new Date().toISOString().slice(0,10)}.json`;a.click();
-  toast('Stage 1 JSON saved.','ok');
-}
-
 /* Stage 2 Excel */
 async function exportStage2Excel() {
   if(!rows.length){toast('No findings to export.','warn');return;}
