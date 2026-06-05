@@ -1250,21 +1250,57 @@ async function exportExcel() {
   toast('Building Excel…');
   const wb=new ExcelJS.Workbook();wb.creator='SnapAudit';wb.created=new Date();
   const hf={type:'pattern',pattern:'solid',fgColor:{argb:'FF183934'}};
+  
   const wsum=wb.addWorksheet('Summary',{tabColor:{argb:'FF183934'}});
   wsum.mergeCells('A1:B1');const tc=wsum.getCell('A1');tc.value='SnapAudit — Full Enriched Report Summary';tc.fill=hf;tc.font={bold:true,color:{argb:'FFEFC71D'},size:13};tc.alignment={vertical:'middle'};wsum.getRow(1).height=28;
   [['Site',meta.site||'—'],['Auditor',meta.aud||meta.auditor||'—'],['Date',meta.date||'—'],['Generated',new Date().toLocaleDateString('en-GB')],['Total Findings',rows.length]].forEach(([k,v],i)=>{wsum.getCell(i+2,1).value=k;wsum.getCell(i+2,1).font={bold:true};wsum.getCell(i+2,2).value=v;});
   wsum.getColumn(1).width=22;wsum.getColumn(2).width=28;
+  
   const wf=wb.addWorksheet('Findings',{tabColor:{argb:'FFEFC71D'}});
-  const COLS=['ID','Location','Department','Category','Finding Type','Severity','Status','Observation','Refined Note','Recommendation','Legal Reference','Parameter','Responsible Person','Target Date','Action Required','Timestamp'];
+  
+  // 1. Added 'Photo' to the header array
+  const COLS=['ID','Location','Department','Photo','Category','Finding Type','Severity','Status','Observation','Refined Note','Recommendation','Legal Reference','Parameter','Responsible Person','Target Date','Action Required','Timestamp'];
   wf.addRow(COLS).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle',wrapText:true};});wf.getRow(1).height=22;
-  wf.columns=[{width:10},{width:28},{width:18},{width:22},{width:20},{width:12},{width:14},{width:45},{width:50},{width:50},{width:40},{width:25},{width:22},{width:14},{width:35},{width:22}];
+  
+  // 2. Inserted a new width constraint for the Photo column
+  wf.columns=[{width:10},{width:28},{width:18},{width:24},{width:22},{width:20},{width:12},{width:14},{width:45},{width:50},{width:50},{width:40},{width:25},{width:22},{width:14},{width:35},{width:22}];
+  
   const SC2={Critical:'FF7b1818',High:'FFc0392b',Medium:'FFd97706',Low:'FF2e8b57'};
-  rows.forEach(r=>{const row=wf.addRow([r.id,r.location,r.department,r.category,r.findingType,r.severity,r.status||'Open',r.observation,r.refined||'',r.recommendation||'',r.legal||'',r.parameter,r.responsiblePerson||'',r.targetDate||'',r.actionRequired||'',r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'']);row.getCell(6).font={bold:true,color:{argb:SC2[r.severity]||'FF000000'}};row.alignment={wrapText:true,vertical:'top'};row.height=44;});
+  
+  rows.forEach((r, idx)=>{
+    const rowNum = idx + 2; 
+    
+    // 3. Passed an empty string '' where the photo will be dynamically embedded
+    const row=wf.addRow([r.id,r.location,r.department,'',r.category,r.findingType,r.severity,r.status||'Open',r.observation,r.refined||'',r.recommendation||'',r.legal||'',r.parameter,r.responsiblePerson||'',r.targetDate||'',r.actionRequired||'',r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'']);
+    
+    // 4. Shifted the severity color target from column 6 to 7 to account for the new Photo column
+    row.getCell(7).font={bold:true,color:{argb:SC2[r.severity]||'FF000000'}};
+    row.alignment={wrapText:true,vertical:'top'};
+    
+    // 5. Expanded the row height explicitly to 90pt to hold photos
+    row.height=90;
+    
+    // 6. The Image Stitching Engine
+    if (r.photos && r.photos[0]) {
+      // Strip out the HTML 'data:image/jpeg;base64,' prefix before feeding to ExcelJS
+      const base64Data = r.photos[0].replace(/^data:image\/\w+;base64,/, "");
+      
+      const imageId = wb.addImage({ base64: base64Data, extension: 'jpeg' });
+      wf.addImage(imageId, {
+        tl: { col: 3, row: rowNum - 1 }, // Anchors to 'Photo' column index (0-indexed framework)
+        ext: { width: 150, height: 105 }, 
+        editAs: 'oneCell' // Locks the image inside the cell boundaries so it filters/sorts perfectly
+      });
+    }
+  });
+  
   wf.autoFilter={from:'A1',to:`${COLS.length},1`};
+  
   const wa=wb.addWorksheet('Action Plan',{tabColor:{argb:'FF1e6fa8'}});
   wa.addRow(['Finding ID','Location','Observation','Severity','Recommendation','Responsible Person','Target Date','Status']).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};});
   wa.columns=[{width:10},{width:28},{width:45},{width:12},{width:55},{width:22},{width:14},{width:14}];
   rows.filter(r=>r.status!=='Resolved').forEach(r=>wa.addRow([r.id,r.location,r.observation,r.severity,r.recommendation||'—',r.responsiblePerson||'—',r.targetDate||'—',r.status||'Open']));
+  
   const buf=await wb.xlsx.writeBuffer();
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   a.download=`SnapAudit-Full-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();
