@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SnapAudit · HSE Audit Workspace</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f2723">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SnapAudit">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<style>
+:root {
+  --teal:   #183934;
+  --teal2:  #1f4842;
+  --teal3:  #0f2723;
+  --gold:   #EFC71D;
+  --goldd:  #c9a300;
+  --ink:    #e9f1ef;
+  --muted:  #9fbab4;
+  --line:   rgba(239,199,29,.18);
+  --ok:     #2e8b57;
+  --danger: #c0392b;
+  --warn:   #e67e22;
+  --shadow: 0 10px 30px rgba(0,0,0,.4);
+  --radius: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--teal3);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  height: -webkit-fill-available;
+  overflow: hidden;
+}
+
+/* ── Top bar ── */
+.app-bar {
+  flex: 0 0 auto;
+  background: linear-gradient(160deg, var(--teal2) 0%, var(--teal) 100%);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  z-index: 10;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--gold) 0%, #a8e063 100%);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--teal3);
+  letter-spacing: -.5px;
+}
+.brand-text .name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -.2px;
+}
+.brand-text .sub {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--gold);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+/* ── Stepper ── */
+.stepper {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+.step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(0,0,0,.12);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: .18s;
+  white-space: nowrap;
+  user-select: none;
+}
+.step:hover { border-color: var(--goldd); color: var(--ink); }
+.step-dot {
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(255,255,255,.08);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.step.active { background: var(--gold); color: var(--teal3); border-color: var(--gold); }
+.step.active .step-dot { background: var(--teal3); color: var(--gold); border-color: transparent; }
+.step.done { border-color: var(--ok); }
+.step.done .step-dot { background: var(--ok); color: #fff; border-color: transparent; }
+.step-badge {
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255,255,255,.18);
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: -2px;
+}
+.step.active .step-badge { background: rgba(15,39,35,.2); }
+.step.done .step-badge { background: rgba(46,139,87,.3); color: #fff; }
+
+/* ── Update banner ── */
+.update-bar {
+  flex: 0 0 auto;
+  background: var(--gold);
+  color: var(--teal3);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 20px;
+  display: none;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+.update-bar.show { display: flex; }
+.update-bar button {
+  appearance: none; border: 2px solid var(--teal3);
+  background: var(--teal3); color: var(--gold);
+  border-radius: 8px; padding: 5px 14px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+
+/* ── Stage frames ── */
+main { flex: 1 1 auto; position: relative; min-height: 0; }
+.frame-wrap { position: absolute; inset: 0; display: none; }
+.frame-wrap.show { display: block; }
+iframe { width: 100%; height: 100%; border: 0; background: #fff; display: block; }
+.loading {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  color: var(--muted); background: var(--teal3);
+  font-size: 14px; z-index: 2;
+}
+.loading.hide { display: none; }
+.spin {
+  width: 36px; height: 36px;
+  border: 3px solid var(--line);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Action bar ── */
+.action-bar {
+  flex: 0 0 auto;
+  background: linear-gradient(0deg, var(--teal2), var(--teal));
+  border-top: 1px solid var(--line);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.hint b { color: var(--ink); }
+.spacer { margin-left: auto; }
+.btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: .16s;
+  background: rgba(255,255,255,.07);
+  color: var(--ink);
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); border-color: var(--goldd); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--gold); color: var(--teal3); border-color: var(--gold); }
+.btn.primary:hover:not(:disabled) { background: #ffd62e; }
+.btn.ghost { background: transparent; }
+.btn.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+
+/* ── Select dropdowns ── */
+.dd { display: inline-flex; }
+.sel {
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  padding: 10px 36px 10px 16px;
+  font-size: 13px; font-weight: 700;
+  background: rgba(255,255,255,.07);
+  color: var(--ink);
+  transition: .16s; font-family: inherit;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%239fbab4' stroke-width='1.7'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+.sel:hover { transform: translateY(-1px); border-color: var(--goldd); }
+.dd.primary .sel {
+  background-color: var(--gold); color: var(--teal3); border-color: var(--gold);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%230f2723' stroke-width='1.8'/></svg>");
+  background-position: right 12px center; background-repeat: no-repeat;
+}
+.dd.primary .sel:hover { background-color: #ffd62e; }
+.sel option { background: var(--teal3); color: var(--ink); font-weight: 600; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; left: 50%; bottom: 80px;
+  transform: translateX(-50%) translateY(10px);
+  background: #1a3d38; color: var(--ink);
+  border: 1px solid var(--goldd);
+  padding: 11px 20px; border-radius: var(--radius);
+  font-size: 13px; font-weight: 600;
+  box-shadow: var(--shadow);
+  opacity: 0; pointer-events: none;
+  transition: .25s; z-index: 100;
+  max-width: 84vw; text-align: center;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.warn { border-color: var(--warn); }
+#toast.ok { border-color: var(--ok); }
+
+/* ── Offline indicator ── */
+.offline-pill {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 20px;
+  padding: 4px 10px;
+  margin-left: 8px;
+}
+.offline-pill.show { display: flex; }
+
+/* ── Responsive ── */
+/* ── Tablet (600–900px) ── */
+@media (max-width: 900px) {
+  .stepper { margin-left: 0; width: 100%; }
+  .app-bar { flex-wrap: wrap; gap: 6px 10px; }
+}
+/* ── Phone (≤ 600px) ── */
+@media (max-width: 600px) {
+  .app-bar { padding: 9px 12px; flex-wrap: wrap; gap: 6px; }
+  .brand-text .sub { display: none; }
+  .brand-logo { width: 28px; height: 28px; font-size: 13px; }
+  .brand-text .name { font-size: 14px; }
+  .stepper { margin-left: 0; width: 100%; gap: 4px; }
+  .step { padding: 8px 6px; font-size: 11px; flex: 1; justify-content: center; min-width: 0; }
+  .step-label { display: none; }
+  .step-badge { font-size: 9px; padding: 1px 5px; }
+  .offline-pill { display: none; }
+  .action-bar { padding: 9px 12px; gap: 6px; flex-wrap: wrap; }
+  .hint { display: none; }
+  .spacer { display: none; }
+  .btn, .dd { flex: 1 1 130px; max-width: 50%; }
+  .dd .sel { width: 100%; }
+  .btn { justify-content: center; font-size: 12px; padding: 9px 10px; }
+  .sel { font-size: 12px; padding: 9px 28px 9px 12px; }
+  #toast { bottom: 90px; font-size: 12px; }
+  .update-bar { font-size: 12px; padding: 8px 12px; flex-wrap: wrap; gap: 6px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="brand">
+    <div class="brand-logo">SA</div>
+    <div class="brand-text">
+      <div class="name">SnapAudit</div>
+      <div class="sub">HSE Audit Workspace</div>
+    </div>
+  </div>
+  <div class="offline-pill" id="offlinePill">
+    <span>⚡</span> Offline
+  </div>
+  <nav class="stepper" id="stepper">
+    <div class="step active" data-stage="0">
+      <span class="step-dot">1</span>
+      <span class="step-label">Field Capture</span>
+      <span class="step-badge" id="badge0">0</span>
+    </div>
+    <div class="step" data-stage="1">
+      <span class="step-dot">2</span>
+      <span class="step-label">Report Builder</span>
+      <span class="step-badge" id="badge1">—</span>
+    </div>
+    <div class="step" data-stage="2">
+      <span class="step-dot">3</span>
+      <span class="step-label">Enrichment &amp; Export</span>
+      <span class="step-badge" id="badge2">—</span>
+    </div>
+  </nav>
+</header>
+
+<div class="update-bar" id="updateBar">
+  🎉 A new version of SnapAudit is available!
+  <button onclick="applyUpdate()">Update Now</button>
+  <button onclick="document.getElementById('updateBar').classList.remove('show')" style="background:transparent;color:var(--teal3);border-color:var(--teal3);">Later</button>
+</div>
+
+<main id="stages">
+  <div class="frame-wrap show" data-stage="0">
+    <div class="loading" id="ld0"><div><div class="spin"></div>Loading Field Capture…</div></div>
+    <iframe id="f1" src="stage1.html" title="Stage 1 — Field Capture"></iframe>
+  </div>
+  <div class="frame-wrap" data-stage="1">
+    <div class="loading" id="ld1"><div><div class="spin"></div>Loading Report Builder…</div></div>
+    <iframe id="f2" src="stage2.html" title="Stage 2 — Report Builder"></iframe>
+  </div>
+  <div class="frame-wrap" data-stage="2">
+    <div class="loading" id="ld2"><div><div class="spin"></div>Loading Enrichment…</div></div>
+    <iframe id="f3" src="stage3.html" title="Stage 3 — Enrichment &amp; Export"></iframe>
+  </div>
+</main>
+
+<footer class="action-bar" id="actions">
+  <span class="hint" id="hint"></span>
+  <div class="spacer"></div>
+
+  <!-- Stage 0 buttons -->
+  <button class="btn primary stage-btn" data-for="0" id="btnTo2">
+    Send to Report Builder <span>→</span>
+  </button>
+
+  <!-- Stage 1 buttons -->
+  <button class="btn ghost stage-btn" data-for="1" id="btnBack1">← Back</button>
+  <button class="btn primary stage-btn" data-for="1" id="btnTo3">
+    Send to Enrichment <span>→</span>
+  </button>
+
+  <!-- Stage 2 buttons -->
+  <button class="btn ghost stage-btn" data-for="2" id="btnBack2">← Back</button>
+  <div class="dd stage-btn" data-for="2">
+    <select class="sel" id="impSel" aria-label="Import">
+      <option value="" selected disabled hidden>📥 Import ▾</option>
+      <option value=".json">JSON (.json)</option>
+      <option value=".csv">CSV (.csv)</option>
+      <option value=".xlsx">Excel (.xlsx)</option>
+    </select>
+  </div>
+  <div class="dd primary stage-btn" data-for="2">
+    <select class="sel" id="expSel" aria-label="Export">
+      <option value="" selected disabled hidden>⬇ Export ▾</option>
+      <optgroup label="── Stage 1 · Field Capture ──">
+        <option value="stage1Excel">Stage 1 — Excel (Location, Obs, Photos)</option>
+        <option value="stage1JSON">Stage 1 — JSON Backup</option>
+      </optgroup>
+      <optgroup label="── Stage 2 · Report Builder ──">
+        <option value="stage2Excel">Stage 2 — Excel (All Fields, No Enrichment)</option>
+        <option value="stage2JSON">Stage 2 — JSON Backup</option>
+      </optgroup>
+      <optgroup label="── Stage 3 · Enriched Report ──">
+        <option value="pdf">Full PDF Report</option>
+        <option value="ppt">PowerPoint (.pptx)</option>
+        <option value="excel">Excel — Full Enriched (.xlsx)</option>
+        <option value="json">JSON Backup</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <input type="file" id="shellImport" accept=".json,.csv,.xlsx" style="display:none">
+</footer>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ── Frames ── */
+const f1 = document.getElementById('f1');
+const f2 = document.getElementById('f2');
+const f3 = document.getElementById('f3');
+const loaded = { 0: false, 1: false, 2: false };
+
+f1.addEventListener('load', () => { loaded[0] = true; document.getElementById('ld0').classList.add('hide'); });
+f2.addEventListener('load', () => { loaded[1] = true; document.getElementById('ld1').classList.add('hide'); });
+f3.addEventListener('load', () => { loaded[2] = true; document.getElementById('ld2').classList.add('hide'); });
+
+/* ── Toast ── */
+let toastTimer;
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (type ? ' ' + type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+/* ── Stage navigation ── */
+let stage = 0;
+const HINTS = [
+  'Capture field observations, then send them to the Report Builder.',
+  'Review the dashboard and findings, then send to Enrichment.',
+  'Enrich findings, add recommendations, then export your report.'
+];
+
+function setStage(n) {
+  stage = n;
+  document.querySelectorAll('.frame-wrap').forEach(w =>
+    w.classList.toggle('show', +w.dataset.stage === n)
+  );
+  document.querySelectorAll('#stepper .step').forEach(s => {
+    const i = +s.dataset.stage;
+    s.classList.toggle('active', i === n);
+    s.classList.toggle('done', i < n);
+  });
+  document.querySelectorAll('.stage-btn').forEach(b =>
+    b.style.display = (+b.dataset.for === n) ? 'inline-flex' : 'none'
+  );
+  document.getElementById('hint').innerHTML = HINTS[n];
+}
+
+document.querySelectorAll('#stepper .step').forEach(s =>
+  s.addEventListener('click', () => setStage(+s.dataset.stage))
+);
+
+/* ── postMessage bridge ── */
+const pending = {};
+let seq = 0;
+
+window.addEventListener('message', ev => {
+  const d = ev.data;
+  if (!d || d.__sa !== true) return;
+
+  /* Live badge updates from Stage 1 */
+  if (d.type === 'badge' && d.stage === 0) {
+    document.getElementById('badge0').textContent = d.count || 0;
+  }
+
+  if (!d.reqId) return;
+  const cb = pending[d.reqId];
+  if (cb) { delete pending[d.reqId]; cb(d); }
+});
+
+function call(iframe, cmd, payload, timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const reqId = 'r' + (++seq) + '_' + Date.now();
+    const timer = setTimeout(() => {
+      if (pending[reqId]) { delete pending[reqId]; reject(new Error('timeout')); }
+    }, timeoutMs);
+    pending[reqId] = d => {
+      clearTimeout(timer);
+      d.type === 'error' ? reject(new Error(d.message || 'error')) : resolve(d);
+    };
+    try {
+      iframe.contentWindow.postMessage({ __sa: true, cmd, reqId, payload }, '*');
+    } catch (e) {
+      clearTimeout(timer); delete pending[reqId]; reject(e);
+    }
+  });
+}
+
+/* ── Hand-offs ── */
+document.getElementById('btnTo2').addEventListener('click', async () => {
+  if (!loaded[0] || !loaded[1]) { toast('Still loading — please wait.', 'warn'); return; }
+  try {
+    const { payload } = await call(f1, 'getPayload', null, 15000);
+    if (!payload || !payload.findings || !payload.findings.length) {
+      toast('Add at least one finding before sending.', 'warn'); return;
+    }
+    f2.contentWindow.postMessage({ __sa: true, cmd: 'receive', payload }, '*');
+    document.getElementById('badge1').textContent = payload.findings.length;
+    setStage(1);
+    toast(`Sent ${payload.findings.length} finding${payload.findings.length !== 1 ? 's' : ''} to Report Builder.`, 'ok');
+  } catch (e) {
+    toast('Hand-off failed — try again.', 'warn');
+  }
+});
+
+document.getElementById('btnTo3').addEventListener('click', async () => {
+  if (!loaded[1] || !loaded[2]) { toast('Still loading — please wait.', 'warn'); return; }
+  try {
+    const { payload } = await call(f2, 'getPayload', null, 15000);
+    const cnt = payload?.findings?.length || 0;
+    if (!cnt) { toast('No findings to send.', 'warn'); return; }
+    f3.contentWindow.postMessage({ __sa: true, cmd: 'receive', payload }, '*');
+    document.getElementById('badge2').textContent = cnt;
+    setStage(2);
+    toast(`Sent ${cnt} finding${cnt !== 1 ? 's' : ''} to Enrichment.`, 'ok');
+  } catch (e) {
+    toast('Hand-off failed — try again.', 'warn');
+  }
+});
+
+document.getElementById('btnBack1').addEventListener('click', () => setStage(0));
+document.getElementById('btnBack2').addEventListener('click', () => setStage(1));
+
+/* ── Export selector ── */
+const EXP_CMD = {
+  stage1Excel: 'exportStage1Excel',
+  stage1JSON:  'exportStage1JSON',
+  stage2Excel: 'exportStage2Excel',
+  stage2JSON:  'exportStage2JSON',
+  pdf:         'exportPDF',
+  ppt:         'exportPPT',
+  excel:       'exportExcel',
+  json:        'exportJSON'
+};
+const EXP_LABEL = {
+  stage1Excel: 'Stage 1 Excel',
+  stage1JSON:  'Stage 1 JSON',
+  stage2Excel: 'Stage 2 Excel',
+  stage2JSON:  'Stage 2 JSON',
+  pdf:         'PDF Report',
+  ppt:         'PowerPoint',
+  excel:       'Full Enriched Excel',
+  json:        'JSON Backup'
+};
+
+document.getElementById('expSel').addEventListener('change', function () {
+  const v = this.value; this.selectedIndex = 0;
+  if (!v) return;
+  if (!loaded[2]) { toast('Stage 3 still loading.', 'warn'); return; }
+  f3.contentWindow.postMessage({ __sa: true, cmd: EXP_CMD[v] }, '*');
+  toast(`Exporting ${EXP_LABEL[v]}…`);
+});
+
+/* ── Import selector ── */
+const impSel = document.getElementById('impSel');
+const shellImport = document.getElementById('shellImport');
+
+impSel.addEventListener('change', function () {
+  const accept = this.value; this.selectedIndex = 0;
+  if (!accept) return;
+  if (!loaded[2]) { toast('Stage 3 still loading.', 'warn'); return; }
+  shellImport.accept = accept;
+  shellImport.value = '';
+  shellImport.click();
+});
+
+shellImport.addEventListener('change', async () => {
+  const file = shellImport.files?.[0]; shellImport.value = '';
+  if (!file) return;
+  try {
+    let payload;
+    if (/\.xlsx$/i.test(file.name)) {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let bin = ''; const CH = 0x8000;
+      for (let i = 0; i < bytes.length; i += CH)
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+      payload = { name: file.name, encoding: 'base64', content: btoa(bin) };
+    } else {
+      payload = { name: file.name, encoding: 'text', content: await file.text() };
+    }
+    f3.contentWindow.postMessage({ __sa: true, cmd: 'importData', payload }, '*');
+    toast(`Importing ${file.name}…`);
+  } catch {
+    toast('Could not read that file.', 'warn');
+  }
+});
+
+/* ── Online / offline indicator ── */
+const offlinePill = document.getElementById('offlinePill');
+function updateOnlineStatus() {
+  offlinePill.classList.toggle('show', !navigator.onLine);
+}
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+updateOnlineStatus();
+
+/* ── Service Worker & update banner ── */
+let newWorker;
+function applyUpdate() {
+  if (newWorker) newWorker.postMessage('SKIP_WAITING');
+}
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js').then(reg => {
+    reg.addEventListener('updatefound', () => {
+      newWorker = reg.installing;
+      newWorker?.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          document.getElementById('updateBar').classList.add('show');
+        }
+      });
+    });
+  }).catch(e => console.warn('SW registration failed:', e));
+
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
+setStage(0);
+</script>
+</body>
+</html>

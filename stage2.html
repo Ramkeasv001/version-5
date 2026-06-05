@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapAudit · Report Builder</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --teal:  #183934; --teal2: #1f4842; --teal3: #0f2723;
+  --gold:  #EFC71D; --goldd: #c9a300;
+  --ink:   #1a2e2b; --muted: #6b8e88; --line: #d0e4e0;
+  --bg:    #f4f8f7; --white: #fff;
+  --crit:  #7b1818; --critb: #fde8e8;
+  --high:  #c0392b; --highb: #fdf0ef;
+  --med:   #d97706; --medb:  #fef3cd;
+  --low:   #2e8b57; --lowb:  #e6f4ec;
+  --ok:    #2e8b57;
+  --r: 10px;
+  --shadow: 0 2px 12px rgba(0,0,0,.09);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); }
+
+/* ── Header ── */
+.app-header {
+  background: linear-gradient(135deg, var(--teal2), var(--teal));
+  color: #fff; padding: 14px 20px;
+  display: flex; align-items: center; gap: 14px;
+  border-bottom: 3px solid var(--gold);
+}
+.app-header h1 { font-size: 16px; font-weight: 800; }
+.app-header .sub { font-size: 10px; color: var(--gold); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.hdr-sp { flex: 1; }
+
+/* ── Toolbar ── */
+.toolbar {
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 20px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.tl-sp { flex: 1; }
+.btn {
+  appearance: none; border: 1.5px solid var(--line); border-radius: var(--r);
+  padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; transition: .15s;
+  background: var(--white); color: var(--ink); font-family: inherit; white-space: nowrap;
+}
+.btn:hover { border-color: var(--teal); color: var(--teal); }
+.btn-teal { background: var(--teal); color: #fff; border-color: var(--teal); }
+.btn-teal:hover { background: var(--teal2); color: #fff; }
+input[type=text], select {
+  border: 1.5px solid var(--line); border-radius: var(--r);
+  padding: 7px 10px; font-size: 12px; font-weight: 500;
+  background: var(--white); color: var(--ink); outline: none; font-family: inherit;
+}
+input[type=text]:focus, select:focus { border-color: var(--teal); }
+
+/* ── Main layout ── */
+.wrap { max-width: 1400px; margin: 0 auto; padding: 18px 20px; }
+
+/* ── Meta card ── */
+.meta-card {
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 14px 18px; margin-bottom: 18px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+}
+.meta-field label {
+  display: block; font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: 4px;
+}
+.meta-field input {
+  width: 100%; border: none; border-bottom: 1.5px solid var(--line);
+  padding: 4px 0; font-size: 13px; font-weight: 600; color: var(--ink);
+  background: transparent; outline: none; font-family: inherit;
+}
+.meta-field input:focus { border-color: var(--teal); }
+
+/* ── KPI cards ── */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px; margin-bottom: 18px;
+}
+.kpi {
+  border-radius: var(--r); padding: 14px 16px; color: #fff;
+  position: relative; overflow: hidden;
+}
+.kpi::after {
+  content: attr(data-icon); position: absolute; right: 10px; bottom: 4px;
+  font-size: 36px; opacity: .18; line-height: 1;
+}
+.kpi .n { font-size: 34px; font-weight: 800; line-height: 1; }
+.kpi .l { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; margin-top: 5px; opacity: .9; }
+.kpi.k-total  { background: var(--teal); }
+.kpi.k-crit   { background: var(--crit); }
+.kpi.k-high   { background: var(--high); }
+.kpi.k-med    { background: var(--med);  }
+.kpi.k-low    { background: var(--low);  }
+.kpi.k-open   { background: #1e6fa8; }
+
+/* ── Charts row ── */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1.4fr 1fr;
+  gap: 14px; margin-bottom: 20px;
+}
+.chart-card {
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 14px;
+  box-shadow: var(--shadow);
+}
+.chart-card h3 {
+  font-size: 11px; font-weight: 700; color: var(--teal);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; text-align: center;
+}
+.chart-wrap { position: relative; height: 200px; }
+
+/* ── Risk matrix ── */
+.risk-matrix {
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--r); padding: 14px; box-shadow: var(--shadow);
+}
+.risk-matrix h3 {
+  font-size: 11px; font-weight: 700; color: var(--teal);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px;
+}
+.rm-grid {
+  display: grid;
+  grid-template-columns: 28px repeat(5, 1fr);
+  grid-template-rows: repeat(5, 36px) 28px;
+  gap: 3px;
+  font-size: 10px;
+}
+.rm-cell {
+  border-radius: 4px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; cursor: default; position: relative;
+  transition: transform .1s;
+}
+.rm-cell:hover { transform: scale(1.08); z-index: 2; }
+.rm-label-y {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.rm-label-x {
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.rm-corner { background: transparent; }
+.rm-axis-title {
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  text-align: center; margin-top: 4px;
+}
+
+/* ── Section header ── */
+.section-hdr {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+}
+.section-hdr h2 {
+  font-size: 12px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--teal);
+}
+.section-hdr::before {
+  content: ""; width: 12px; height: 12px; background: var(--gold); border-radius: 3px; flex-shrink: 0;
+}
+
+/* ── Table ── */
+.tbl-wrap {
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 20px;
+}
+.tbl-toolbar {
+  display: flex; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.obs-table { width: 100%; border-collapse: collapse; }
+.obs-table th {
+  background: var(--teal); color: var(--gold);
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: 9px 10px; text-align: left; white-space: nowrap;
+}
+.obs-table td {
+  padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top;
+  font-size: 12.5px;
+}
+.obs-table tr:last-child td { border-bottom: none; }
+.obs-table tr:hover td { background: #f7fbfa; }
+.obs-table textarea, .obs-table input[type=text], .obs-table select {
+  width: 100%; font-family: inherit; font-size: 12px;
+  border: 1.5px solid var(--line); border-radius: 6px; padding: 5px 7px;
+  color: var(--ink); background: var(--white); outline: none; resize: vertical;
+}
+.obs-table textarea { min-height: 56px; line-height: 1.4; }
+.obs-table textarea:focus, .obs-table input:focus, .obs-table select:focus { border-color: var(--teal); }
+.obs-table th.col-n { width: 44px; }
+.obs-table th.col-loc { width: 130px; }
+.obs-table th.col-cat { width: 120px; }
+.obs-table th.col-sev { width: 100px; }
+.obs-table th.col-st { width: 100px; }
+.obs-table th.col-ph { width: 90px; }
+.obs-table th.col-act { width: 70px; }
+.sn { font-weight: 800; color: var(--teal); text-align: center; }
+select.sev-Critical { background: var(--critb); color: var(--crit); font-weight: 700; border-color: #fcc; }
+select.sev-High     { background: var(--highb); color: var(--high); font-weight: 700; border-color: #f9c; }
+select.sev-Medium   { background: var(--medb);  color: var(--med);  font-weight: 700; border-color: #fdd; }
+select.sev-Low      { background: var(--lowb);  color: var(--low);  font-weight: 700; border-color: #cfc; }
+select.st-Open        { background: #fff3e0; color: #d97706; font-weight: 700; }
+select.st-InProgress  { background: #e7f3fb; color: #1e6fa8; font-weight: 700; }
+select.st-Resolved    { background: var(--lowb); color: var(--low); font-weight: 700; }
+.thumb { width: 70px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; display: block; }
+.photo-empty {
+  width: 70px; height: 52px; border: 1.5px dashed var(--line); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; cursor: pointer; background: var(--bg); color: var(--muted);
+}
+.del-btn {
+  appearance: none; background: var(--highb); color: var(--high);
+  border: 1px solid #fcc; border-radius: 6px;
+  padding: 5px 9px; font-size: 12px; cursor: pointer; font-weight: 700;
+}
+.del-btn:hover { background: #fdd; }
+
+/* ── Empty / loading ── */
+.empty-state {
+  padding: 60px 24px; text-align: center; color: var(--muted);
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--r); margin-bottom: 20px;
+}
+.empty-state .ico { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; font-weight: 700; color: var(--teal); margin-bottom: 6px; }
+
+/* ── Lightbox ── */
+.lightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,.88);
+  display: none; place-items: center; z-index: 999;
+}
+.lightbox.show { display: grid; }
+.lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 10px; }
+.lb-close {
+  position: absolute; top: 16px; right: 20px;
+  background: rgba(255,255,255,.15); border: none; border-radius: 50%;
+  width: 40px; height: 40px; font-size: 20px; color: #fff;
+  cursor: pointer; display: grid; place-items: center;
+}
+
+/* ── Toast ── */
+.toast-wrap { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; }
+.toast-item {
+  background: var(--teal3); color: #fff; padding: 10px 18px;
+  border-radius: var(--r); font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25); opacity: 0; transform: translateY(8px);
+  transition: .3s; pointer-events: none; white-space: nowrap;
+}
+.toast-item.show { opacity: 1; transform: none; }
+
+/* ── Responsive ── */
+/* ── Tablet (800–1100px) ── */
+@media (max-width: 1100px) {
+  .charts-row { grid-template-columns: 1fr 1fr; }
+  .kpis { grid-template-columns: repeat(3, 1fr); }
+}
+/* ── Small tablet / large phone (600–800px) ── */
+@media (max-width: 800px) {
+  .kpis { grid-template-columns: repeat(3, 1fr); }
+  .charts-row { grid-template-columns: 1fr; }
+  .meta-card { grid-template-columns: 1fr 1fr; }
+  .wrap { padding: 14px; }
+  #riskRow { grid-template-columns: 1fr !important; }
+}
+/* ── Phone (≤ 600px) ── */
+@media (max-width: 600px) {
+  html { font-size: 13px; }
+  .app-header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .app-header h1 { font-size: 14px; }
+  .app-header .sub { display: none; }
+  .toolbar { padding: 8px 12px; gap: 6px; }
+  .toolbar input, .toolbar select { font-size: 12px; }
+  .wrap { padding: 10px 12px; }
+  .kpis { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+  .kpi .n { font-size: 26px; }
+  .kpi { padding: 12px 12px; }
+  .charts-row { grid-template-columns: 1fr; gap: 10px; }
+  .chart-card { padding: 12px; }
+  .chart-wrap.h180 { height: 180px; }
+  .meta-card { grid-template-columns: 1fr; gap: 8px; padding: 12px; }
+  .tbl-toolbar { padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
+  .tbl-toolbar input { flex: 1 1 100%; }
+  .tbl-toolbar select { flex: 1 1 calc(50% - 3px); font-size: 12px; }
+  /* Table horizontal scroll on phone */
+  #tblContent { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .obs-table { min-width: 700px; }
+  .obs-table th, .obs-table td { padding: 7px 8px; font-size: 11px; }
+  .thumb { width: 56px; height: 42px; }
+  .photo-empty { width: 56px; height: 42px; }
+  #hintBanner { font-size: 12px; padding: 10px 12px; }
+  #hintBanner strong { display: block; margin-bottom: 3px; }
+  .rm-cell { height: 30px; font-size: 11px; }
+  .rm-lbl-y, .rm-lbl-x { height: 30px; font-size: 8px; }
+}
+/* ── Very small (≤ 360px) ── */
+@media (max-width: 360px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .kpi .n { font-size: 22px; }
+  .kpi .l { font-size: 8px; }
+  .kpi { padding: 10px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>Stage 2 — Report Builder</h1>
+    <div class="sub">Dashboard &amp; Findings Review</div>
+  </div>
+  <div class="hdr-sp"></div>
+  <button class="btn" onclick="document.getElementById('importFile').click()">📥 Import JSON / CSV / Excel</button>
+  <button class="btn btn-teal" onclick="addRow()">＋ Add Row</button>
+  <input type="file" id="importFile" accept=".json,.csv,.xlsx" style="display:none">
+</header>
+
+<div class="wrap">
+
+  <!-- Hint banner -->
+  <div id="hintBanner" style="display:none;background:#e7f3fb;border:1px solid #b3d4ec;border-radius:10px;padding:12px 18px;margin-bottom:16px;font-size:13px;color:#1e4f72;display:flex;align-items:center;gap:10px;">
+    <span style="font-size:18px;">✏️</span>
+    <span><strong>Stage 2 — Fill in the details.</strong> Location and observation came from Stage 1. Set the <strong>Severity, Category, Finding Type, Responsible Person</strong> and other fields in the table below.</span>
+    <button onclick="this.parentElement.style.display='none'" style="margin-left:auto;background:none;border:none;font-size:16px;cursor:pointer;color:#1e4f72;">×</button>
+  </div>
+
+  <!-- Meta -->
+  <div class="meta-card" id="metaCard" style="display:none;">
+    <div class="meta-field"><label>Site / Project</label><input id="m_site" placeholder="—"></div>
+    <div class="meta-field"><label>Auditor</label><input id="m_aud" placeholder="—"></div>
+    <div class="meta-field"><label>Date</label><input id="m_date" placeholder="—"></div>
+    <div class="meta-field"><label>Audit Type</label><input id="m_type" placeholder="—"></div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis">
+    <div class="kpi k-total"  data-icon="📋"><div class="n" id="k_total">0</div><div class="l">Total</div></div>
+    <div class="kpi k-crit"   data-icon="🔴"><div class="n" id="k_crit">0</div><div class="l">Critical</div></div>
+    <div class="kpi k-high"   data-icon="🟠"><div class="n" id="k_high">0</div><div class="l">High</div></div>
+    <div class="kpi k-med"    data-icon="🟡"><div class="n" id="k_med">0</div><div class="l">Medium</div></div>
+    <div class="kpi k-low"    data-icon="🟢"><div class="n" id="k_low">0</div><div class="l">Low</div></div>
+    <div class="kpi k-open"   data-icon="📂"><div class="n" id="k_open">0</div><div class="l">Open</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row" id="chartsRow" style="display:none;">
+    <div class="chart-card">
+      <h3>Severity Split</h3>
+      <div class="chart-wrap"><canvas id="chartSev"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Category Breakdown</h3>
+      <div class="chart-wrap"><canvas id="chartCat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Finding Type</h3>
+      <div class="chart-wrap"><canvas id="chartType"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Status Overview</h3>
+      <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Risk Matrix -->
+  <div class="charts-row" id="riskRow" style="display:none;grid-template-columns:1fr 1fr;margin-bottom:20px;">
+    <div class="risk-matrix" id="riskMatrixCard">
+      <h3>Risk Matrix — Likelihood × Consequence</h3>
+      <div class="rm-grid" id="rmGrid"></div>
+      <div class="rm-axis-title">Consequence →</div>
+    </div>
+    <div class="chart-card">
+      <h3>Top Locations by Finding Count</h3>
+      <div class="chart-wrap"><canvas id="chartLoc"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="section-hdr"><h2>Findings Review Table</h2></div>
+  <div class="tbl-wrap" id="tblWrap">
+    <div class="tbl-toolbar">
+      <input type="text" id="tblSearch" placeholder="🔍 Search…" style="flex:1;min-width:150px;">
+      <select id="tblSev">
+        <option value="">All severities</option>
+        <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+      </select>
+      <select id="tblCat"><option value="">All categories</option></select>
+      <select id="tblStatus">
+        <option value="">All statuses</option>
+        <option>Open</option><option>In Progress</option><option>Resolved</option>
+      </select>
+    </div>
+    <div id="tblContent">
+      <div class="empty-state">
+        <div class="ico">📊</div>
+        <h3>No data yet</h3>
+        <p>Send findings from Stage 1, or import a file above.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lb" onclick="closeLb()">
+  <button class="lb-close">×</button>
+  <img id="lbImg" src="" alt="">
+</div>
+
+<div class="toast-wrap"><div class="toast-item" id="toast"></div></div>
+<input type="file" id="photoUploader" accept="image/*" style="display:none">
+
+<script>
+'use strict';
+
+const STORE = 'snapaudit_s2_v1';
+let rows = [], meta = {}, charts_map = {};
+let photoTargetIdx = -1;
+
+/* ── Persist ── */
+function persist() {
+  try { localStorage.setItem(STORE, JSON.stringify({ rows, meta })); } catch {}
+}
+function loadPersisted() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (d) { rows = d.rows || []; meta = d.meta || {}; }
+  } catch {}
+}
+
+/* ── Meta bar ── */
+function bindMeta() {
+  ['m_site','m_aud','m_date','m_type'].forEach(id => {
+    const el = document.getElementById(id);
+    const k = id.replace('m_','');
+    el.value = meta[k] || '';
+    el.addEventListener('change', () => { meta[k] = el.value; persist(); });
+  });
+}
+
+/* ── Toast ── */
+let tt;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+/* ── Shell message bridge ── */
+window.addEventListener('message', ev => {
+  const d = ev.data;
+  if (!d || d.__sa !== true) return;
+  const reply = data => { try { ev.source.postMessage({ __sa: true, reqId: d.reqId, ...data }, '*'); } catch {} };
+  if (d.cmd === 'receive') {
+    ingestPayload(d.payload);
+  } else if (d.cmd === 'getPayload') {
+    reply({ type: 'ok', payload: buildPayload() });
+  }
+});
+
+function buildPayload() {
+  return { version: 'snapaudit-v1', meta, exportedAt: new Date().toISOString(), findings: rows };
+}
+
+/* ── Ingest from Stage 1 ── */
+function ingestPayload(payload) {
+  if (!payload) return;
+  meta = { ...meta, ...payload.meta };
+  bindMeta();
+  rows = (payload.findings || []).map(f => ({
+    ...f,
+    status: f.status || 'Open',
+    likelihood: f.likelihood || 3,
+    consequence: f.consequence || 3
+  }));
+  persist();
+  buildCategoryFilter();
+  renderAll();
+  document.getElementById('hintBanner').style.display = 'flex';
+  toast(`Loaded ${rows.length} finding${rows.length !== 1 ? 's' : ''}.`);
+}
+
+/* ── Import file ── */
+document.getElementById('importFile').addEventListener('change', async function () {
+  const file = this.files?.[0]; this.value = '';
+  if (!file) return;
+  try {
+    if (/\.json$/i.test(file.name)) {
+      const d = JSON.parse(await file.text());
+      ingestPayload(d.findings ? d : { findings: Array.isArray(d) ? d : [] });
+    } else if (/\.csv$/i.test(file.name)) {
+      rows = csvToRows(await file.text());
+      persist(); buildCategoryFilter(); renderAll();
+    } else {
+      toast('Use JSON or CSV for direct import.');
+    }
+  } catch(e) { toast('Import error: ' + e.message); }
+});
+
+function csvToRows(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,'').toLowerCase());
+  return lines.slice(1).map((line, i) => {
+    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g,''));
+    const r = {};
+    headers.forEach((h, j) => r[h] = vals[j] || '');
+    return {
+      id: r.id || ('F' + String(i+1).padStart(3,'0')),
+      location: r.location || r.loc || '',
+      category: r.category || 'Other',
+      findingType: r.findingtype || r.finding_type || 'Unsafe Condition',
+      severity: r.severity || 'Medium',
+      observation: r.observation || r.obs || '',
+      responsiblePerson: r.responsibleperson || r.responsible || '',
+      targetDate: r.targetdate || r.target || '',
+      actionRequired: r.actionrequired || r.action || '',
+      status: r.status || 'Open',
+      photos: [],
+      timestamp: r.timestamp || new Date().toISOString(),
+      likelihood: Number(r.likelihood) || 3,
+      consequence: Number(r.consequence) || 3
+    };
+  });
+}
+
+/* ── Category filter ── */
+function buildCategoryFilter() {
+  const sel = document.getElementById('tblCat');
+  const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All categories</option>' +
+    cats.map(c => `<option>${c}</option>`).join('');
+}
+
+/* ── Add empty row ── */
+function addRow() {
+  rows.push({
+    id: 'F' + String(rows.length + 1).padStart(3,'0'),
+    location: '', department: '', category: 'Other', findingType: 'Unsafe Condition',
+    severity: 'Medium', observation: '', responsiblePerson: '', targetDate: '',
+    actionRequired: '', status: 'Open', photos: [],
+    timestamp: new Date().toISOString(), likelihood: 3, consequence: 3
+  });
+  persist(); renderAll();
+  toast('Row added.');
+}
+
+/* ── Filtered list ── */
+function filteredRows() {
+  const search = document.getElementById('tblSearch').value.toLowerCase();
+  const sev = document.getElementById('tblSev').value;
+  const cat = document.getElementById('tblCat').value;
+  const status = document.getElementById('tblStatus').value;
+  return rows.filter(r =>
+    (!search || r.location.toLowerCase().includes(search) || r.observation.toLowerCase().includes(search)) &&
+    (!sev || r.severity === sev) &&
+    (!cat || r.category === cat) &&
+    (!status || r.status === status)
+  );
+}
+
+['tblSearch','tblSev','tblCat','tblStatus'].forEach(id =>
+  document.getElementById(id).addEventListener('change', () => { renderTable(); renderCharts(); })
+);
+document.getElementById('tblSearch').addEventListener('input', () => { renderTable(); renderCharts(); });
+
+/* ── Render all ── */
+function renderAll() {
+  renderKPIs();
+  renderCharts();
+  renderTable();
+  renderRiskMatrix();
+  document.getElementById('metaCard').style.display = '';
+  document.getElementById('chartsRow').style.display = rows.length ? '' : 'none';
+  document.getElementById('riskRow').style.display = rows.length ? '' : 'none';
+}
+
+/* ── KPIs ── */
+function renderKPIs() {
+  const cnts = { Critical:0, High:0, Medium:0, Low:0 };
+  let open = 0;
+  rows.forEach(r => {
+    cnts[r.severity] = (cnts[r.severity]||0)+1;
+    if (r.status !== 'Resolved') open++;
+  });
+  document.getElementById('k_total').textContent = rows.length;
+  document.getElementById('k_crit').textContent = cnts.Critical || 0;
+  document.getElementById('k_high').textContent = cnts.High || 0;
+  document.getElementById('k_med').textContent  = cnts.Medium || 0;
+  document.getElementById('k_low').textContent  = cnts.Low || 0;
+  document.getElementById('k_open').textContent = open;
+}
+
+/* ── Charts ── */
+const SEV_COLORS  = { Critical: '#7b1818', High: '#c0392b', Medium: '#d97706', Low: '#2e8b57' };
+const CAT_PALETTE = ['#183934','#2e8b57','#1e6fa8','#d97706','#7b1818','#8b2fc9','#c0392b','#5d7a76','#4d9f78','#a07030','#555'];
+const TYPE_COLORS = { 'Unsafe Condition':'#c0392b','Unsafe Act':'#d97706','Near Miss':'#f59e0b','Positive Observation':'#2e8b57','Improvement Opportunity':'#1e6fa8' };
+
+function destroyChart(key) {
+  if (charts_map[key]) { try { charts_map[key].destroy(); } catch {} delete charts_map[key]; }
+}
+
+function renderCharts() {
+  if (!rows.length) return;
+  const visible = filteredRows();
+
+  /* Severity doughnut */
+  destroyChart('sev');
+  const sevCnts = { Critical:0, High:0, Medium:0, Low:0 };
+  visible.forEach(r => sevCnts[r.severity] = (sevCnts[r.severity]||0)+1);
+  charts_map.sev = new Chart(document.getElementById('chartSev'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(sevCnts),
+      datasets: [{ data: Object.values(sevCnts), backgroundColor: Object.keys(sevCnts).map(k=>SEV_COLORS[k]), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font:{size:10}, padding:8 } } }, cutout: '62%' }
+  });
+
+  /* Category bar */
+  destroyChart('cat');
+  const catCnts = {};
+  visible.forEach(r => catCnts[r.category||'Other'] = (catCnts[r.category||'Other']||0)+1);
+  const catSorted = Object.entries(catCnts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  charts_map.cat = new Chart(document.getElementById('chartCat'), {
+    type: 'bar',
+    data: {
+      labels: catSorted.map(x=>x[0].length>14?x[0].slice(0,14)+'…':x[0]),
+      datasets: [{ data: catSorted.map(x=>x[1]), backgroundColor: CAT_PALETTE, borderRadius: 5 }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks:{font:{size:10}}, grid:{color:'#eee'} }, y: { ticks:{font:{size:10}} } }
+    }
+  });
+
+  /* Finding type doughnut */
+  destroyChart('type');
+  const typeCnts = {};
+  visible.forEach(r => typeCnts[r.findingType||'Other'] = (typeCnts[r.findingType||'Other']||0)+1);
+  charts_map.type = new Chart(document.getElementById('chartType'), {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(typeCnts),
+      datasets: [{ data: Object.values(typeCnts), backgroundColor: Object.keys(typeCnts).map(k=>TYPE_COLORS[k]||'#aaa'), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font:{size:10}, padding:8 } } }, cutout: '55%' }
+  });
+
+  /* Status pie */
+  destroyChart('status');
+  const stCnts = { Open:0, 'In Progress':0, Resolved:0 };
+  visible.forEach(r => stCnts[r.status||'Open'] = (stCnts[r.status||'Open']||0)+1);
+  charts_map.status = new Chart(document.getElementById('chartStatus'), {
+    type: 'pie',
+    data: {
+      labels: Object.keys(stCnts),
+      datasets: [{ data: Object.values(stCnts), backgroundColor: ['#d97706','#1e6fa8','#2e8b57'], borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font:{size:10}, padding:8 } } } }
+  });
+
+  /* Top locations bar */
+  destroyChart('loc');
+  const locCnts = {};
+  visible.forEach(r => locCnts[r.location||'Unknown'] = (locCnts[r.location||'Unknown']||0)+1);
+  const locSorted = Object.entries(locCnts).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  charts_map.loc = new Chart(document.getElementById('chartLoc'), {
+    type: 'bar',
+    data: {
+      labels: locSorted.map(x=>x[0].length>18?x[0].slice(0,18)+'…':x[0]),
+      datasets: [{ data: locSorted.map(x=>x[1]), backgroundColor: '#183934', borderRadius: 5 }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks:{font:{size:10}}, grid:{color:'#eee'} }, y: { ticks:{font:{size:10}} } }
+    }
+  });
+}
+
+/* ── Risk Matrix ── */
+function renderRiskMatrix() {
+  if (!rows.length) return;
+  const CONS = [1,2,3,4,5];
+  const LIKE = [5,4,3,2,1]; // top = high likelihood
+  const counts = {};
+  rows.forEach(r => {
+    const k = `${r.likelihood||3},${r.consequence||3}`;
+    counts[k] = (counts[k]||0)+1;
+  });
+  const rmColor = (l,c) => {
+    const score = l * c;
+    if (score >= 15) return '#fde8e8';
+    if (score >= 9)  return '#fef3cd';
+    if (score >= 4)  return '#fff9e6';
+    return '#e6f4ec';
+  };
+  const rmTextColor = (l,c) => {
+    const score = l * c;
+    if (score >= 15) return '#7b1818';
+    if (score >= 9)  return '#d97706';
+    if (score >= 4)  return '#a07030';
+    return '#2e8b57';
+  };
+  const grid = document.getElementById('rmGrid');
+  grid.innerHTML = '';
+
+  // Top-left corner
+  const corner = document.createElement('div');
+  corner.className = 'rm-corner';
+  grid.appendChild(corner);
+  // X axis headers
+  CONS.forEach(c => {
+    const h = document.createElement('div');
+    h.className = 'rm-label-x';
+    h.textContent = c;
+    grid.appendChild(h);
+  });
+  // Rows
+  LIKE.forEach(l => {
+    const yl = document.createElement('div');
+    yl.className = 'rm-label-y';
+    yl.textContent = l;
+    grid.appendChild(yl);
+    CONS.forEach(c => {
+      const cell = document.createElement('div');
+      cell.className = 'rm-cell';
+      const k = `${l},${c}`;
+      const cnt = counts[k] || 0;
+      cell.style.background = rmColor(l,c);
+      cell.style.color = rmTextColor(l,c);
+      cell.textContent = cnt || '';
+      if (cnt) cell.title = `L${l}×C${c}: ${cnt} finding${cnt!==1?'s':''}`;
+      cell.style.border = cnt ? `2px solid ${rmTextColor(l,c)}` : '1px solid #e0e0e0';
+      cell.style.fontSize = cnt > 9 ? '10px' : '13px';
+      grid.appendChild(cell);
+    });
+  });
+  // Y label
+  const yl = document.createElement('div');
+  yl.className = 'rm-label-y rm-axis-title';
+  yl.style.cssText = 'writing-mode:vertical-rl;transform:rotate(180deg);font-size:9px;font-weight:700;color:var(--muted);text-align:center;margin-top:4px;grid-column:1;';
+  yl.textContent = 'Likelihood ↑';
+  grid.appendChild(yl);
+}
+
+/* ── Table render ── */
+function renderTable() {
+  const visible = filteredRows();
+  const content = document.getElementById('tblContent');
+
+  if (!visible.length) {
+    content.innerHTML = `<div class="empty-state"><div class="ico">${rows.length?'🔍':'📊'}</div>
+      <h3>${rows.length?'No matches':'No data yet'}</h3></div>`;
+    return;
+  }
+
+  const table = document.createElement('table');
+  table.className = 'obs-table';
+  table.innerHTML = `<thead><tr>
+    <th class="col-n">#</th>
+    <th class="col-loc">Location</th>
+    <th class="col-cat">Category</th>
+    <th>Observation</th>
+    <th>Action Required</th>
+    <th class="col-sev">Severity</th>
+    <th class="col-st">Status</th>
+    <th>Responsible</th>
+    <th class="col-ph">Photo</th>
+    <th class="col-act">Act.</th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+
+  visible.forEach((r, i) => {
+    const globalIdx = rows.indexOf(r);
+    const tr = document.createElement('tr');
+
+    const photoHtml = (r.photos && r.photos[0])
+      ? `<img class="thumb" src="${r.photos[0]}" onclick="openLb('${r.photos[0]}')">`
+      : `<div class="photo-empty" onclick="triggerPhoto(${globalIdx})">📷</div>`;
+
+    tr.innerHTML = `
+      <td class="sn">${i+1}</td>
+      <td><input type="text" value="${esc(r.location)}" onchange="upd(${globalIdx},'location',this.value)" placeholder="Location"></td>
+      <td>
+        <select onchange="upd(${globalIdx},'category',this.value)">
+          ${catOptions(r.category)}
+        </select>
+      </td>
+      <td><textarea onchange="upd(${globalIdx},'observation',this.value)">${esc(r.observation)}</textarea></td>
+      <td><textarea onchange="upd(${globalIdx},'actionRequired',this.value)">${esc(r.actionRequired||'')}</textarea></td>
+      <td>
+        <select class="sev-${r.severity}" onchange="updSev(${globalIdx},this)">
+          ${['Critical','High','Medium','Low'].map(s=>`<option ${s===r.severity?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select class="st-${(r.status||'Open').replace(' ','')}" onchange="updStatus(${globalIdx},this)">
+          ${['Open','In Progress','Resolved'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="text" value="${esc(r.responsiblePerson||'')}" onchange="upd(${globalIdx},'responsiblePerson',this.value)" placeholder="—"></td>
+      <td>${photoHtml}</td>
+      <td><button class="del-btn" onclick="delRow(${globalIdx})">🗑</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  content.innerHTML = '';
+  content.appendChild(table);
+}
+
+const CATS = ['Electrical','Mechanical','Civil / Structural','Fire Safety','Housekeeping','PPE / Personnel','Environmental','Chemical / Hazmat','Ergonomics','HSE Management','Other'];
+function catOptions(current) {
+  return CATS.map(c => `<option ${c===current?'selected':''}>${c}</option>`).join('');
+}
+
+function upd(i, k, v) { rows[i][k] = v; persist(); renderKPIs(); }
+function updSev(i, sel) {
+  rows[i].severity = sel.value;
+  sel.className = 'sev-' + sel.value;
+  persist(); renderKPIs(); renderCharts();
+}
+function updStatus(i, sel) {
+  rows[i].status = sel.value;
+  sel.className = 'st-' + sel.value.replace(' ','');
+  persist(); renderKPIs(); renderCharts();
+}
+function delRow(i) {
+  rows.splice(i, 1); persist();
+  buildCategoryFilter(); renderAll();
+  toast('Row deleted.');
+}
+
+/* ── Photo upload in table ── */
+function triggerPhoto(i) { photoTargetIdx = i; document.getElementById('photoUploader').click(); }
+document.getElementById('photoUploader').addEventListener('change', async function () {
+  const file = this.files?.[0]; this.value = '';
+  if (!file || photoTargetIdx < 0) return;
+  const b64 = await compressImg(file);
+  if (!rows[photoTargetIdx].photos) rows[photoTargetIdx].photos = [];
+  rows[photoTargetIdx].photos[0] = b64;
+  persist(); renderTable();
+});
+
+function compressImg(file) {
+  return new Promise(res => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height, M = 800;
+        if (w > M || h > M) { if (w > h) { h = Math.round(h*M/w); w = M; } else { w = Math.round(w*M/h); h = M; } }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        res(c.toDataURL('image/jpeg', 0.78));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ── Lightbox ── */
+function openLb(src) { document.getElementById('lbImg').src = src; document.getElementById('lb').classList.add('show'); }
+function closeLb() { document.getElementById('lb').classList.remove('show'); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLb(); });
+
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ── Init ── */
+loadPersisted();
+bindMeta();
+buildCategoryFilter();
+renderAll();
+</script>
+</body>
+</html>

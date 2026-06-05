@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapAudit · Field Capture</title>
+<style>
+:root {
+  --teal:  #183934; --teal2: #1f4842; --teal3: #0f2723;
+  --gold:  #EFC71D; --goldd: #c9a300;
+  --ink:   #1a2e2b; --muted: #6b8e88; --line: #d0e4e0;
+  --bg:    #f4f8f7; --white: #ffffff;
+  --crit:  #7b1818; --critb: #fde8e8;
+  --high:  #c0392b; --highb: #fdf0ef;
+  --med:   #d97706; --medb:  #fef3cd;
+  --low:   #2e8b57; --lowb:  #e6f4ec;
+  --info:  #1e6fa8; --infob: #e7f3fb;
+  --ok:    #2e8b57;
+  --shadow: 0 2px 12px rgba(0,0,0,.1);
+  --r: 10px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  min-height: 100vh;
+}
+
+/* ── Top header ── */
+.app-header {
+  background: linear-gradient(135deg, var(--teal2), var(--teal));
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 3px solid var(--gold);
+}
+.app-header h1 { font-size: 16px; font-weight: 800; }
+.app-header .sub { font-size: 10px; color: var(--gold); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.hdr-spacer { flex: 1; }
+
+/* ── Stats bar ── */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  background: var(--teal);
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.stat {
+  padding: 10px 12px;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,.08);
+  cursor: default;
+}
+.stat:last-child { border-right: none; }
+.stat .n { font-size: 22px; font-weight: 800; color: var(--gold); line-height: 1; }
+.stat .l { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: rgba(255,255,255,.65); margin-top: 3px; }
+
+/* ── Layout ── */
+.workspace {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 0;
+  height: calc(100dvh - 116px);
+  overflow: hidden;
+}
+.left-panel {
+  background: var(--white);
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+.right-panel {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg);
+}
+
+/* ── Meta settings ── */
+.meta-section {
+  background: var(--teal3);
+  padding: 14px 16px;
+}
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.meta-field label {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--gold);
+  margin-bottom: 3px;
+}
+.meta-field input, .meta-field select {
+  width: 100%;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(239,199,29,.25);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  outline: none;
+  font-family: inherit;
+}
+.meta-field input::placeholder { color: rgba(255,255,255,.4); }
+.meta-field input:focus, .meta-field select:focus { border-color: var(--gold); }
+.meta-field select option { background: var(--teal3); color: #fff; }
+
+/* ── Form panel ── */
+.form-section {
+  padding: 16px;
+  flex: 1;
+}
+.form-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--teal);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.form-title::before {
+  content: "";
+  width: 12px; height: 12px;
+  background: var(--gold);
+  border-radius: 3px;
+  display: block;
+}
+.field { margin-bottom: 12px; }
+.field label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.field label .req { color: var(--high); }
+input[type=text], input[type=date], textarea, select.field-sel {
+  width: 100%;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--white);
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s;
+}
+input[type=text]:focus, input[type=date]:focus, textarea:focus, select.field-sel:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 3px rgba(24,57,52,.08);
+}
+textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+
+/* ── Photo upload ── */
+.photo-zone {
+  border: 2px dashed var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: .15s;
+  background: var(--bg);
+}
+.photo-zone:hover { border-color: var(--teal); background: #edf5f3; }
+.photo-zone .ico { font-size: 28px; margin-bottom: 4px; }
+.photo-zone .lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.photo-zone .hint { font-size: 10px; color: #aac4bf; margin-top: 2px; }
+.photo-previews {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.photo-thumb {
+  position: relative;
+  width: 72px; height: 72px;
+}
+.photo-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1.5px solid var(--line);
+}
+.photo-thumb .rm {
+  position: absolute;
+  top: -5px; right: -5px;
+  width: 18px; height: 18px;
+  background: var(--high);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 900;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+/* ── Form actions ── */
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: var(--r);
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: .15s;
+  font-family: inherit;
+}
+.btn:hover:not(:disabled) { transform: translateY(-1px); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary { background: var(--teal); color: #fff; flex: 1; justify-content: center; }
+.btn-primary:hover:not(:disabled) { background: var(--teal2); }
+.btn-ghost { background: transparent; border: 1.5px solid var(--line); color: var(--muted); }
+.btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+.btn-danger { background: var(--highb); color: var(--high); border: 1.5px solid #fcc; }
+.btn-sm { padding: 7px 12px; font-size: 12px; }
+
+/* ── Right panel toolbar ── */
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.panel-header h2 {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--teal);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.count-pill {
+  background: var(--teal);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 2px 10px;
+}
+.ph-spacer { flex: 1; }
+
+/* ── Filter bar ── */
+.filter-bar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--white);
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.filter-bar input, .filter-bar select {
+  border: 1.5px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s;
+  background: var(--white);
+  color: var(--ink);
+}
+.filter-bar input { flex: 1 1 180px; }
+.filter-bar input:focus, .filter-bar select:focus { border-color: var(--teal); }
+
+/* ── Findings list ── */
+.findings-list { padding: 12px; }
+.finding-card {
+  background: var(--white);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r);
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: box-shadow .15s;
+}
+.finding-card:hover { box-shadow: var(--shadow); }
+.finding-card.editing { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(24,57,52,.1); }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: #fafcfb;
+}
+.card-num {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  width: 28px;
+  flex-shrink: 0;
+}
+.sev-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 3px 9px;
+  letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.sev-Critical { background: var(--critb); color: var(--crit); }
+.sev-High     { background: var(--highb); color: var(--high); }
+.sev-Medium   { background: var(--medb);  color: var(--med);  }
+.sev-Low      { background: var(--lowb);  color: var(--low);  }
+.card-loc {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--teal);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-ts {
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.card-body { padding: 10px 14px; }
+.card-obs {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.card-tags {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.card-photos {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.card-photo {
+  width: 52px; height: 52px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  cursor: zoom-in;
+}
+.card-footer {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line);
+  background: #fafcfb;
+}
+.card-action {
+  appearance: none;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: inherit;
+  transition: .12s;
+}
+.card-action:hover { color: var(--teal); border-color: var(--teal); }
+.card-action.del:hover { color: var(--high); border-color: var(--high); background: var(--highb); }
+
+/* ── Empty state ── */
+.empty-state {
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.empty-state .ico { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; font-weight: 700; color: var(--teal); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; line-height: 1.5; max-width: 260px; margin: 0 auto; }
+
+/* ── Lightbox ── */
+.lightbox {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.88);
+  display: none;
+  place-items: center;
+  z-index: 999;
+}
+.lightbox.show { display: grid; }
+.lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 10px; }
+.lightbox-close {
+  position: absolute; top: 16px; right: 20px;
+  background: rgba(255,255,255,.15);
+  border: none; border-radius: 50%;
+  width: 40px; height: 40px;
+  font-size: 20px; color: #fff; cursor: pointer;
+  display: grid; place-items: center;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  display: none;
+  place-items: center;
+  z-index: 998;
+}
+.modal-overlay.show { display: grid; }
+.modal-box {
+  background: var(--white);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 380px;
+  width: 90vw;
+  box-shadow: 0 20px 60px rgba(0,0,0,.3);
+}
+.modal-box h3 { font-size: 16px; font-weight: 800; color: var(--teal); margin-bottom: 8px; }
+.modal-box p { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 18px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── Toasts ── */
+.toast-wrap {
+  position: fixed; bottom: 20px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column;
+  align-items: center; gap: 8px;
+  z-index: 1000;
+}
+.toast-item {
+  background: var(--teal3);
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: var(--r);
+  font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(0,0,0,.25);
+  opacity: 0; transform: translateY(8px);
+  transition: .3s;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.toast-item.show { opacity: 1; transform: none; }
+.toast-item.success { border-left: 3px solid var(--ok); }
+.toast-item.warn { border-left: 3px solid var(--med); }
+.toast-item.error { border-left: 3px solid var(--high); }
+
+/* ── Responsive ── */
+/* ── Tablet (600–900px) ── */
+@media (max-width: 900px) {
+  .workspace { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .left-panel { border-right: none; border-bottom: 1px solid var(--line); max-height: none; }
+  .right-panel { min-height: 50vh; }
+}
+/* ── Phone (≤ 600px) ── */
+@media (max-width: 600px) {
+  html { font-size: 13px; }
+  .app-header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .app-header h1 { font-size: 14px; }
+  .app-header .sub { display: none; }
+  .app-header .btn { font-size: 11px; padding: 6px 10px; }
+  .stats-bar { grid-template-columns: repeat(3, 1fr); }
+  .stat .n { font-size: 18px; }
+  .stat { padding: 8px 6px; }
+  .meta-section { padding: 10px 12px; }
+  .meta-grid { grid-template-columns: 1fr; gap: 7px; }
+  .form-section { padding: 12px; }
+  .filter-bar { padding: 8px 12px; gap: 6px; }
+  .filter-bar input { flex: 1 1 100%; }
+  .filter-bar select { flex: 1 1 calc(50% - 3px); font-size: 12px; }
+  .panel-header { padding: 10px 12px; }
+  .findings-list { padding: 8px; }
+  .finding-card .card-header { padding: 8px 10px; }
+  .finding-card .card-body  { padding: 8px 10px; }
+  .finding-card .card-footer { padding: 6px 10px; }
+  .card-loc { font-size: 11px; }
+  .card-obs { font-size: 12px; }
+  .modal-box { padding: 18px; }
+  .form-actions { flex-direction: column; }
+  .btn-primary, .btn-ghost { width: 100%; justify-content: center; }
+}
+/* ── Very small (≤ 360px) ── */
+@media (max-width: 360px) {
+  .stats-bar { grid-template-columns: repeat(3, 1fr); }
+  .stat .l { font-size: 8px; }
+  .stat .n { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>Stage 1 — Field Capture</h1>
+    <div class="sub">Walkaround Audit · Live Log</div>
+  </div>
+  <div class="hdr-spacer"></div>
+  <button class="btn btn-ghost btn-sm" id="btnClearAll" style="border-color:rgba(255,255,255,.3);color:#fff;">🗑 Clear All</button>
+  <button class="btn btn-ghost btn-sm" style="border-color:rgba(255,255,255,.3);color:#fff;" onclick="exportJSON()">💾 Backup JSON</button>
+</header>
+
+<div class="stats-bar">
+  <div class="stat"><div class="n" id="s_total">0</div><div class="l">Total</div></div>
+  <div class="stat"><div class="n" id="s_photos">0</div><div class="l">With Photos</div></div>
+  <div class="stat"><div class="n" id="s_today">0</div><div class="l">Today</div></div>
+</div>
+
+<div class="workspace">
+  <!-- LEFT: capture form -->
+  <div class="left-panel">
+    <div class="meta-section">
+      <div class="meta-grid">
+        <div class="meta-field">
+          <label>Auditor Name</label>
+          <input type="text" id="m_auditor" placeholder="Your name">
+        </div>
+        <div class="meta-field">
+          <label>Site / Project</label>
+          <input type="text" id="m_site" placeholder="Site name">
+        </div>
+        <div class="meta-field">
+          <label>Audit Date</label>
+          <input type="date" id="m_date" style="color-scheme:dark;">
+        </div>
+        <div class="meta-field">
+          <label>Audit Type</label>
+          <select id="m_type">
+            <option>General Walkaround</option>
+            <option>Safety Inspection</option>
+            <option>Environmental Audit</option>
+            <option>Fire Safety</option>
+            <option>Electrical Safety</option>
+            <option>Pre-Task Assessment</option>
+            <option>Incident Investigation</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <div class="form-title" id="formTitle">Capture Observation</div>
+
+      <div class="field">
+        <label>Location <span class="req">*</span></label>
+        <input type="text" id="f_location" placeholder="e.g. Block A — Workshop Floor" autocomplete="off">
+      </div>
+
+      <div class="field">
+        <label>Observation <span class="req">*</span></label>
+        <textarea id="f_obs" rows="4" placeholder="Describe the finding, risk condition, unsafe act or gap observed…"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Photo(s)</label>
+        <div class="photo-zone" id="photoZone" onclick="document.getElementById('photoInput').click()">
+          <div class="ico">📷</div>
+          <div class="lbl">Tap to add photos</div>
+          <div class="hint">JPEG/PNG · max 900px · multiple allowed</div>
+        </div>
+        <div class="photo-previews" id="photoPreviews"></div>
+        <input type="file" id="photoInput" accept="image/*" multiple style="display:none">
+      </div>
+
+      <input type="hidden" id="editId" value="">
+
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btnSubmit" onclick="submitFinding()">
+          ＋ Log to Audit
+        </button>
+        <button class="btn btn-ghost" id="btnCancel" style="display:none;" onclick="cancelEdit()">
+          Cancel
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;text-align:center;">
+        Auto-saved locally · press <kbd style="font-size:10px;padding:1px 4px;border:1px solid var(--line);border-radius:3px;">Esc</kbd> to cancel edit
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: findings log -->
+  <div class="right-panel">
+    <div class="panel-header">
+      <h2>Live Audit Log</h2>
+      <span class="count-pill" id="countPill">0</span>
+      <div class="ph-spacer"></div>
+    </div>
+    <div class="filter-bar">
+      <input type="text" id="filterSearch" placeholder="🔍 Search location, observation…">
+      <select id="sortBy">
+        <option value="newest">Newest first</option>
+        <option value="oldest">Oldest first</option>
+        <option value="location">By location</option>
+      </select>
+    </div>
+    <div class="findings-list" id="findingsList">
+      <div class="empty-state" id="emptyState">
+        <div class="ico">📋</div>
+        <h3>No findings yet</h3>
+        <p>Use the form to capture your first field observation.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">×</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- Confirm modal -->
+<div class="modal-overlay" id="confirmOverlay">
+  <div class="modal-box">
+    <h3 id="confirmTitle">Confirm</h3>
+    <p id="confirmMsg">Are you sure?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirmOk">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+'use strict';
+
+const STORE_KEY = 'snapaudit_s1_v1';
+const META_KEY  = 'snapaudit_s1_meta_v1';
+const SEV_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
+let nextId = 1;
+
+const state = {
+  findings: [],
+  meta: { auditor: '', site: '', date: '', type: 'General Walkaround' },
+  pendingPhotos: [],
+  editId: null,
+  filter: { search: '', sort: 'newest' }
+};
+
+/* ── Persistence ── */
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ findings: state.findings, nextId })); } catch {}
+  try { localStorage.setItem(META_KEY, JSON.stringify(state.meta)); } catch {}
+  notifyShell();
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) { const d = JSON.parse(raw); state.findings = d.findings || []; nextId = d.nextId || 1; }
+  } catch { state.findings = []; }
+  try {
+    const m = localStorage.getItem(META_KEY);
+    if (m) state.meta = { ...state.meta, ...JSON.parse(m) };
+  } catch {}
+}
+
+/* ── Meta inputs ── */
+function bindMeta() {
+  ['m_auditor','m_site','m_date','m_type'].forEach(id => {
+    const el = document.getElementById(id);
+    const key = id.replace('m_','');
+    el.value = state.meta[key] || '';
+    el.addEventListener('change', () => { state.meta[key] = el.value; save(); });
+  });
+  if (!state.meta.date) {
+    document.getElementById('m_date').value = new Date().toISOString().slice(0,10);
+    state.meta.date = document.getElementById('m_date').value;
+  }
+}
+
+/* ── Photo handling ── */
+document.getElementById('photoInput').addEventListener('change', async function () {
+  for (const file of this.files) {
+    const b64 = await compressImage(file, 900, 0.78);
+    state.pendingPhotos.push(b64);
+  }
+  this.value = '';
+  renderPreviews();
+});
+
+function compressImage(file, maxDim, quality) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+          else       { w = Math.round(w * maxDim / h); h = maxDim; }
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPreviews() {
+  const wrap = document.getElementById('photoPreviews');
+  wrap.innerHTML = '';
+  state.pendingPhotos.forEach((src, i) => {
+    const d = document.createElement('div');
+    d.className = 'photo-thumb';
+    d.innerHTML = `<img src="${src}" onclick="openLightbox('${src}')">
+      <button class="rm" onclick="removePhoto(${i})">×</button>`;
+    wrap.appendChild(d);
+  });
+}
+
+function removePhoto(i) {
+  state.pendingPhotos.splice(i, 1);
+  renderPreviews();
+}
+
+/* ── Submit / edit ── */
+function submitFinding() {
+  const loc = document.getElementById('f_location').value.trim();
+  const obs = document.getElementById('f_obs').value.trim();
+  if (!loc || !obs) { showToast('Location and Observation are required.', 'warn'); return; }
+
+  const finding = {
+    id: state.editId || ('F' + String(nextId++).padStart(3,'0')),
+    timestamp: state.editId
+      ? (state.findings.find(f=>f.id===state.editId)?.timestamp || new Date().toISOString())
+      : new Date().toISOString(),
+    location: loc,
+    observation: obs,
+    photos: [...state.pendingPhotos],
+    /* fields below are filled in Stage 2 */
+    department: '', category: 'Housekeeping', findingType: 'Unsafe Condition',
+    severity: 'Medium', responsiblePerson: '', targetDate: '',
+    actionRequired: '', status: 'Open'
+  };
+
+  if (state.editId) {
+    const idx = state.findings.findIndex(f => f.id === state.editId);
+    if (idx >= 0) state.findings[idx] = { ...state.findings[idx], ...finding };
+  } else {
+    state.findings.push(finding);
+  }
+
+  save(); resetForm(); render();
+  showToast(state.editId ? 'Finding updated.' : 'Finding logged!', 'success');
+}
+
+function editFinding(id) {
+  const f = state.findings.find(x => x.id === id);
+  if (!f) return;
+  state.editId = id;
+  document.getElementById('f_location').value = f.location;
+  document.getElementById('f_obs').value = f.observation;
+  state.pendingPhotos = f.photos ? [...f.photos] : [];
+  renderPreviews();
+  document.getElementById('formTitle').textContent = 'Editing Finding ' + id;
+  document.getElementById('btnSubmit').textContent = '✓ Update Finding';
+  document.getElementById('btnCancel').style.display = 'inline-flex';
+  document.getElementById('f_location').focus();
+  if (window.innerWidth <= 900) {
+    document.querySelector('.left-panel').scrollIntoView({ behavior: 'smooth' });
+  }
+  render();
+}
+
+function cancelEdit() {
+  resetForm();
+  render();
+}
+
+function resetForm() {
+  document.getElementById('f_location').value = '';
+  document.getElementById('f_obs').value = '';
+  state.pendingPhotos = [];
+  renderPreviews();
+  state.editId = null;
+  document.getElementById('editId').value = '';
+  document.getElementById('formTitle').textContent = 'Capture Observation';
+  document.getElementById('btnSubmit').textContent = '＋ Log to Audit';
+  document.getElementById('btnCancel').style.display = 'none';
+}
+
+/* ── Delete ── */
+let confirmCb = null;
+function openConfirm(title, msg, cb) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  confirmCb = cb;
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.remove('show');
+  confirmCb = null;
+}
+document.getElementById('confirmOk').addEventListener('click', () => {
+  if (confirmCb) confirmCb();
+  closeConfirm();
+});
+
+function deleteFinding(id) {
+  openConfirm('Delete finding?', 'This cannot be undone.', () => {
+    state.findings = state.findings.filter(f => f.id !== id);
+    if (state.editId === id) resetForm();
+    save(); render();
+    showToast('Finding deleted.', 'success');
+  });
+}
+
+function clearAll() {
+  if (!state.findings.length) { showToast('No findings to clear.', 'warn'); return; }
+  openConfirm('Clear all findings?',
+    `This will delete all ${state.findings.length} finding(s). Export a backup first.`,
+    () => { state.findings = []; nextId = 1; resetForm(); save(); render(); showToast('All findings cleared.', 'success'); }
+  );
+}
+document.getElementById('btnClearAll').addEventListener('click', clearAll);
+
+/* ── Filter / sort ── */
+document.getElementById('filterSearch').addEventListener('input', function() {
+  state.filter.search = this.value.toLowerCase(); render();
+});
+
+document.getElementById('sortBy').addEventListener('change', function() {
+  state.filter.sort = this.value; render();
+});
+
+function filtered() {
+  let list = [...state.findings];
+  const { search, sort } = state.filter;
+  if (search) list = list.filter(f =>
+    f.location.toLowerCase().includes(search) ||
+    f.observation.toLowerCase().includes(search)
+  );
+  if (sort === 'newest')   list.sort((a,b) => b.timestamp.localeCompare(a.timestamp));
+  if (sort === 'oldest')   list.sort((a,b) => a.timestamp.localeCompare(b.timestamp));
+  if (sort === 'location') list.sort((a,b) => a.location.localeCompare(b.location));
+  return list;
+}
+
+/* ── Render ── */
+function render() {
+  const list = filtered();
+  const all  = state.findings;
+  const today = new Date().toISOString().slice(0, 10);
+  const withPhotos = all.filter(f => f.photos && f.photos.length > 0).length;
+  const todayCount = all.filter(f => f.timestamp.slice(0, 10) === today).length;
+
+  document.getElementById('s_total').textContent  = all.length;
+  document.getElementById('s_photos').textContent = withPhotos;
+  document.getElementById('s_today').textContent  = todayCount;
+  document.getElementById('countPill').textContent =
+    list.length === all.length ? `${all.length} finding${all.length!==1?'s':''}` :
+    `${list.length} of ${all.length}`;
+
+  const container = document.getElementById('findingsList');
+  const empty = document.getElementById('emptyState');
+
+  if (!list.length) {
+    empty.style.display = '';
+    container.querySelectorAll('.finding-card').forEach(el => el.remove());
+    return;
+  }
+  empty.style.display = 'none';
+
+  /* Build a map for diffing */
+  const existing = {};
+  container.querySelectorAll('.finding-card').forEach(el => existing[el.dataset.id] = el);
+
+  /* Re-render all cards (simple approach - fine for ~100 items) */
+  container.querySelectorAll('.finding-card').forEach(el => el.remove());
+  list.forEach((f, i) => {
+    const card = buildCard(f, i + 1);
+    container.appendChild(card);
+  });
+}
+
+function buildCard(f, num) {
+  const ts = new Date(f.timestamp);
+  const tsStr = ts.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) +
+    ' ' + ts.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+
+  const photosHtml = (f.photos||[]).slice(0,4).map(src =>
+    `<img class="card-photo" src="${src}" onclick="openLightbox('${src}')">`
+  ).join('');
+
+  const tags = [];
+  tags.push('Edit details in Stage 2');
+
+  const el = document.createElement('div');
+  el.className = `finding-card${state.editId === f.id ? ' editing' : ''}`;
+  el.dataset.id = f.id;
+  el.innerHTML = `
+    <div class="card-header">
+      <span class="card-num">#${num}</span>
+      <span class="card-loc" title="${esc(f.location)}">${esc(f.location)}</span>
+      ${f.photos && f.photos.length ? `<span style="font-size:10px;color:var(--muted);">📷 ${f.photos.length}</span>` : ''}
+      <span class="card-ts">${tsStr}</span>
+    </div>
+    <div class="card-body">
+      <div class="card-obs">${esc(f.observation)}</div>
+      ${tags.length ? `<div class="card-tags">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${photosHtml ? `<div class="card-photos">${photosHtml}</div>` : ''}
+    </div>
+    <div class="card-footer">
+      <button class="card-action" onclick="editFinding('${f.id}')">✏ Edit</button>
+      <button class="card-action del" onclick="deleteFinding('${f.id}')">🗑 Delete</button>
+      <span style="font-size:10px;color:var(--muted);margin-left:auto;align-self:center;">${f.id}</span>
+    </div>`;
+  return el;
+}
+
+function esc(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Lightbox ── */
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('show');
+}
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('show');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeLightbox();
+    if (state.editId) cancelEdit();
+  }
+});
+
+/* ── Toast ── */
+function showToast(msg, type='') {
+  const wrap = document.getElementById('toastWrap');
+  const el = document.createElement('div');
+  el.className = 'toast-item ' + type;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(() => { requestAnimationFrame(() => el.classList.add('show')); });
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 350);
+  }, 2600);
+}
+
+/* ── Export JSON backup ── */
+function exportJSON() {
+  if (!state.findings.length) { showToast('Nothing to export.', 'warn'); return; }
+  const payload = buildPayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `SnapAudit-Stage1-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+/* ── Shell communication ── */
+function notifyShell() {
+  try {
+    window.parent.postMessage({ __sa: true, type: 'badge', stage: 0, count: state.findings.length }, '*');
+  } catch {}
+}
+
+function buildPayload() {
+  return {
+    version: 'snapaudit-v1',
+    meta: state.meta,
+    exportedAt: new Date().toISOString(),
+    findings: state.findings
+  };
+}
+
+window.addEventListener('message', ev => {
+  const d = ev.data;
+  if (!d || d.__sa !== true) return;
+  const reply = (data) => {
+    try { ev.source.postMessage({ __sa: true, reqId: d.reqId, ...data }, '*'); } catch {}
+  };
+  try {
+    if (d.cmd === 'getPayload') {
+      reply({ type: 'ok', payload: buildPayload() });
+    }
+  } catch (e) {
+    reply({ type: 'error', message: String(e?.message || e) });
+  }
+});
+
+/* ── Init ── */
+load();
+bindMeta();
+render();
+</script>
+</body>
+</html>

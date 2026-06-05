@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapAudit · Enrichment &amp; Export</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<style>
+:root {
+  --teal:  #183934; --teal2: #1f4842; --teal3: #0f2723;
+  --gold:  #EFC71D; --goldd: #c9a300;
+  --ink:   #1a2e2b; --muted: #6b8e88; --line: #d0e4e0;
+  --bg:    #f4f8f7; --white: #fff;
+  --crit:  #7b1818; --critb: #fde8e8;
+  --high:  #c0392b; --highb: #fdf0ef;
+  --med:   #d97706; --medb:  #fef3cd;
+  --low:   #2e8b57; --lowb:  #e6f4ec;
+  --info:  #1e6fa8; --infob: #e7f3fb;
+  --ok:    #2e8b57;
+  --r: 10px; --shadow: 0 2px 14px rgba(0,0,0,.09);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--ink); min-height: 100vh; }
+
+/* ── Header ── */
+.app-header {
+  background: linear-gradient(135deg, var(--teal2), var(--teal));
+  color: #fff; padding: 12px 20px; display: flex; align-items: center; gap: 14px;
+  border-bottom: 3px solid var(--gold); position: sticky; top: 0; z-index: 50;
+}
+.app-header h1 { font-size: 15px; font-weight: 800; }
+.app-header .sub { font-size: 10px; color: var(--gold); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
+.hdr-sp { flex: 1; }
+
+/* ── Tabs ── */
+.tab-bar {
+  display: flex; gap: 0;
+  background: var(--teal3);
+  border-bottom: 3px solid var(--gold);
+  position: sticky; top: 53px; z-index: 40;
+  padding: 0 20px;
+}
+.tab {
+  padding: 11px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
+  color: rgba(255,255,255,.55); border-bottom: 3px solid transparent;
+  margin-bottom: -3px; transition: .15s; letter-spacing: .02em; user-select: none;
+  display: flex; align-items: center; gap: 7px;
+}
+.tab:hover { color: rgba(255,255,255,.85); }
+.tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.tab .tab-badge {
+  background: rgba(239,199,29,.2); color: var(--gold); font-size: 10px;
+  font-weight: 700; border-radius: 10px; padding: 1px 7px;
+}
+.tab.active .tab-badge { background: var(--gold); color: var(--teal3); }
+
+/* ── Enrichment controls strip ── */
+.enrich-strip {
+  background: var(--white); border-bottom: 1px solid var(--line);
+  padding: 10px 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.enrich-strip .label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; }
+.btn-e {
+  appearance: none; border: 1.5px solid var(--line); border-radius: var(--r);
+  padding: 8px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; transition: .15s;
+  background: var(--white); color: var(--ink); font-family: inherit; white-space: nowrap;
+}
+.btn-e:hover { border-color: var(--teal); color: var(--teal); transform: translateY(-1px); }
+.btn-e.teal { background: var(--teal); color: #fff; border-color: var(--teal); }
+.btn-e.teal:hover { background: var(--teal2); }
+.btn-e:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* ── Panels ── */
+.panel { display: none; }
+.panel.active { display: block; }
+.wrap { max-width: 1440px; margin: 0 auto; padding: 18px 20px; }
+
+/* ══════════════ DASHBOARD PANEL ══════════════ */
+
+/* KPI row */
+.kpi-row {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 10px; margin-bottom: 18px;
+}
+.kpi {
+  border-radius: var(--r); padding: 13px 14px; color: #fff;
+  position: relative; overflow: hidden; cursor: default;
+}
+.kpi::after {
+  content: attr(data-icon); position: absolute; right: 6px; bottom: 0;
+  font-size: 34px; opacity: .14; line-height: 1;
+}
+.kpi .n { font-size: 28px; font-weight: 800; line-height: 1; }
+.kpi .l { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; opacity: .9; }
+.kpi .pct { font-size: 10px; font-weight: 600; opacity: .75; margin-top: 2px; }
+.k-total { background: linear-gradient(135deg, #183934, #2a5f57); }
+.k-crit  { background: linear-gradient(135deg, #7b1818, #a82020); }
+.k-high  { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+.k-med   { background: linear-gradient(135deg, #d97706, #f59e0b); }
+.k-low   { background: linear-gradient(135deg, #2e8b57, #3cb371); }
+.k-open  { background: linear-gradient(135deg, #1e6fa8, #2980b9); }
+.k-done  { background: linear-gradient(135deg, #2e7d32, #388e3c); }
+.k-photo { background: linear-gradient(135deg, #5d4037, #795548); }
+
+/* Section header */
+.section-hdr {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 12px; margin-top: 22px;
+}
+.section-hdr h2 {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--teal);
+}
+.section-hdr::before { content:""; width:12px; height:12px; background:var(--gold); border-radius:3px; flex-shrink:0; }
+.section-hdr .sec-hint { font-size: 11px; color: var(--muted); margin-left: 4px; }
+
+/* Chart grid */
+.chart-grid-3 { display: grid; grid-template-columns: 1fr 1.6fr 1fr; gap: 14px; margin-bottom: 14px; }
+.chart-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.chart-grid-full { margin-bottom: 14px; }
+
+.chart-card {
+  background: var(--white); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 16px; box-shadow: var(--shadow); position: relative;
+}
+.chart-card h3 {
+  font-size: 11px; font-weight: 800; color: var(--teal); text-transform: uppercase;
+  letter-spacing: .07em; margin-bottom: 4px;
+}
+.chart-card .chart-sub { font-size: 10px; color: var(--muted); margin-bottom: 12px; }
+.chart-wrap { position: relative; }
+.chart-wrap.h180 { height: 180px; }
+.chart-wrap.h220 { height: 220px; }
+.chart-wrap.h260 { height: 260px; }
+.chart-wrap.h300 { height: 300px; }
+
+/* Risk matrix */
+.rm-grid {
+  display: grid; grid-template-columns: 24px repeat(5, 1fr);
+  gap: 3px;
+}
+.rm-cell {
+  border-radius: 5px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; cursor: default; height: 36px;
+  transition: transform .1s, box-shadow .1s; position: relative;
+}
+.rm-cell:hover { transform: scale(1.1); z-index: 2; box-shadow: 0 3px 10px rgba(0,0,0,.2); }
+.rm-lbl-y {
+  writing-mode: vertical-rl; transform: rotate(180deg);
+  font-size: 9px; font-weight: 700; color: var(--muted);
+  display: flex; align-items: center; justify-content: center; height: 36px;
+}
+.rm-lbl-x {
+  font-size: 9px; font-weight: 700; color: var(--muted); height: 22px;
+  display: flex; align-items: center; justify-content: center;
+}
+.rm-axis { font-size: 9px; font-weight: 700; color: var(--muted); text-align: center; margin-top: 4px; }
+
+/* Progress bars */
+.prog-list { display: flex; flex-direction: column; gap: 8px; }
+.prog-item { }
+.prog-header { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 11px; font-weight: 600; }
+.prog-bar { height: 10px; background: var(--line); border-radius: 10px; overflow: hidden; }
+.prog-fill { height: 100%; border-radius: 10px; transition: width .6s ease; }
+
+/* Stat table inside chart card */
+.stat-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.stat-table td { padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.stat-table tr:last-child td { border-bottom: none; }
+.stat-table .val { font-weight: 700; text-align: right; }
+.stat-table .bar-col { width: 80px; }
+.mini-bar { height: 6px; background: var(--line); border-radius: 6px; overflow: hidden; margin-top: 2px; }
+.mini-fill { height: 100%; border-radius: 6px; }
+
+/* ══════════════ TABLE PANEL ══════════════ */
+.tbl-card {
+  background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); margin-bottom: 20px;
+}
+.tbl-head {
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  border-bottom: 1px solid var(--line); background: #fafcfb; flex-wrap: wrap;
+}
+.tbl-head h2 { font-size: 12px; font-weight: 800; color: var(--teal); text-transform: uppercase; letter-spacing: .07em; }
+.tbl-head::before { content:""; width:12px; height:12px; background:var(--gold); border-radius:3px; flex-shrink:0; }
+.th-sp { flex: 1; }
+input[type=text], select.flt {
+  border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 10px;
+  font-size: 12px; outline: none; font-family: inherit;
+  background: var(--white); color: var(--ink); transition: border-color .15s;
+}
+input[type=text]:focus, select.flt:focus { border-color: var(--teal); }
+.obs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.obs-table th {
+  background: var(--teal); color: var(--gold); padding: 9px 10px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  text-align: left; white-space: nowrap;
+}
+.obs-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.obs-table tr:last-child td { border-bottom: none; }
+.obs-table tr:hover td { background: #f7fbfa; }
+.obs-table textarea, .obs-table input[type=text], .obs-table select {
+  width: 100%; font-family: inherit; font-size: 11.5px;
+  border: 1.5px solid var(--line); border-radius: 6px; padding: 5px 7px;
+  color: var(--ink); background: var(--white); outline: none; resize: vertical;
+}
+.obs-table textarea { min-height: 52px; line-height: 1.4; }
+.obs-table textarea:focus, .obs-table input:focus, .obs-table select:focus { border-color: var(--teal); }
+.sn { font-weight: 800; color: var(--teal); text-align: center; font-size: 13px; }
+.raw-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+select.sev-Critical { background: var(--critb); color: var(--crit); font-weight:700; border-color:#fcc; }
+select.sev-High     { background: var(--highb); color: var(--high); font-weight:700; border-color:#f9c; }
+select.sev-Medium   { background: var(--medb);  color: var(--med);  font-weight:700; border-color:#fdd; }
+select.sev-Low      { background: var(--lowb);  color: var(--low);  font-weight:700; border-color:#cfc; }
+select.st-Open       { background:#fff3e0; color:#d97706; font-weight:700; }
+select.st-InProgress { background:#e7f3fb; color:#1e6fa8; font-weight:700; }
+select.st-Resolved   { background:var(--lowb); color:var(--low); font-weight:700; }
+.reroll-btn {
+  appearance: none; background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; color: var(--muted); font-family: inherit;
+  transition: .12s; margin-top: 4px; display: inline-flex; align-items: center; gap: 4px;
+}
+.reroll-btn:hover { color: var(--teal); border-color: var(--teal); }
+.del-btn {
+  appearance: none; background: var(--highb); color: var(--high); border: 1px solid #fcc;
+  border-radius: 6px; padding: 5px 9px; font-size: 12px; cursor: pointer; font-weight: 700;
+}
+.del-btn:hover { background: #fdd; }
+.thumb { width: 68px; height: 52px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); cursor: zoom-in; }
+.ph-empty {
+  width: 68px; height: 52px; border: 1.5px dashed var(--line); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  cursor: pointer; background: var(--bg); color: var(--muted);
+}
+.empty-state { padding: 60px 24px; text-align: center; color: var(--muted); }
+.empty-state .ico { font-size: 48px; margin-bottom: 12px; }
+.empty-state h3 { font-size: 16px; font-weight: 700; color: var(--teal); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; max-width: 280px; margin: 0 auto; line-height: 1.5; }
+
+/* ── Enriching banner ── */
+.enriching-banner {
+  display: none; align-items: center; gap: 10px; justify-content: center;
+  padding: 10px; background: #e7f3fb; border-bottom: 1px solid #c3dcee;
+  font-size: 13px; font-weight: 600; color: #1e6fa8;
+}
+.enriching-banner.show { display: flex; }
+.spin { width: 18px; height: 18px; border: 2px solid #c3dcee; border-top-color: #1e6fa8;
+  border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Lightbox ── */
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.88); display: none; place-items: center; z-index: 999; }
+.lightbox.show { display: grid; }
+.lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 10px; }
+.lb-close { position: absolute; top: 16px; right: 20px; background: rgba(255,255,255,.15);
+  border: none; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; color: #fff; cursor: pointer; display: grid; place-items: center; }
+
+/* ── Toast ── */
+.toast-wrap { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; }
+.toast-item {
+  background: var(--teal3); color: #fff; padding: 10px 20px; border-radius: var(--r);
+  font-size: 13px; font-weight: 600; box-shadow: 0 4px 20px rgba(0,0,0,.3);
+  opacity: 0; transform: translateY(8px); transition: .3s; pointer-events: none; white-space: nowrap;
+}
+.toast-item.show { opacity: 1; transform: none; }
+.toast-item.ok   { border-left: 3px solid var(--ok); }
+.toast-item.warn { border-left: 3px solid var(--med); }
+
+/* ── Responsive ── */
+/* Tablet landscape (900–1100px) */
+@media (max-width: 1100px) {
+  .chart-grid-3 { grid-template-columns: 1fr 1fr; }
+  .kpi-row { grid-template-columns: repeat(4, 1fr); }
+}
+/* Tablet portrait (600–900px) */
+@media (max-width: 900px) {
+  .kpi-row { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .chart-grid-3, .chart-grid-2 { grid-template-columns: 1fr; }
+  .tab { padding: 10px 14px; font-size: 12px; }
+  .enrich-strip { padding: 8px 14px; }
+  .wrap { padding: 14px; }
+}
+/* Phone (≤ 600px) */
+@media (max-width: 600px) {
+  html { font-size: 13px; }
+  .app-header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; }
+  .app-header h1 { font-size: 14px; }
+  .app-header .sub { display: none; }
+  /* Tab bar */
+  .tab-bar { padding: 0 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+  .tab { padding: 10px 12px; font-size: 11px; flex-shrink: 0; }
+  .tab .tab-badge { display: none; }
+  /* Enrich strip */
+  .enrich-strip { padding: 8px 12px; gap: 6px; flex-wrap: wrap; }
+  .enrich-strip .label { width: 100%; }
+  .btn-e { font-size: 12px; padding: 8px 12px; flex: 1 1 calc(50% - 4px); justify-content: center; }
+  .enrich-strip span.label:last-child { display: none; }
+  /* KPI cards */
+  .wrap { padding: 10px 12px; }
+  .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 7px; margin-bottom: 14px; }
+  .kpi { padding: 11px 12px; }
+  .kpi .n { font-size: 24px; }
+  .kpi .l { font-size: 8.5px; }
+  .kpi .pct { font-size: 9px; }
+  /* Charts */
+  .chart-grid-3, .chart-grid-2 { grid-template-columns: 1fr; gap: 10px; }
+  .chart-card { padding: 12px; }
+  .chart-card h3 { font-size: 10px; }
+  .chart-wrap.h180, .chart-wrap.h220 { height: 200px; }
+  .chart-wrap.h260, .chart-wrap.h300, .chart-wrap.h240 { height: 220px; }
+  .section-hdr { margin-top: 16px; margin-bottom: 8px; }
+  .section-hdr h2 { font-size: 10px; }
+  .section-hdr .sec-hint { display: none; }
+  /* Risk matrix shrink */
+  .rm-cell { height: 28px; font-size: 10px; }
+  .rm-lbl-y, .rm-lbl-x { height: 28px; font-size: 8px; }
+  .rm-grid { gap: 2px; }
+  /* Progress bars */
+  .prog-header { font-size: 10px; }
+  /* Table panel */
+  .tbl-head { padding: 10px 12px; gap: 6px; flex-wrap: wrap; }
+  .tbl-head h2 { font-size: 11px; }
+  .tbl-head input { flex: 1 1 100%; }
+  .tbl-head select { flex: 1 1 calc(50% - 3px); font-size: 11px; }
+  /* Table horizontal scroll */
+  #tblContent { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .obs-table { min-width: 800px; }
+  .obs-table th { font-size: 9px; padding: 8px 8px; }
+  .obs-table td { font-size: 11px; padding: 7px 8px; }
+  .obs-table textarea { min-height: 44px; font-size: 11px; }
+  .obs-table input[type=text] { font-size: 11px; }
+  .thumb { width: 56px; height: 42px; }
+  .ph-empty { width: 56px; height: 42px; }
+  .reroll-btn { font-size: 10px; padding: 3px 7px; }
+}
+/* Very small phones (≤ 360px) */
+@media (max-width: 360px) {
+  .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+  .kpi .n { font-size: 20px; }
+  .kpi .l { font-size: 8px; }
+  .kpi { padding: 9px 10px; }
+  .tab { font-size: 10px; padding: 9px 10px; }
+  .btn-e { font-size: 11px; padding: 7px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div>
+    <h1>Stage 3 — Enrichment &amp; Export</h1>
+    <div class="sub">Interactive Dashboard · Observation Polishing · Export</div>
+  </div>
+  <div class="hdr-sp"></div>
+  <button class="btn-e teal" onclick="addRow()" style="font-size:12px;padding:7px 12px;">＋ Add Row</button>
+</header>
+
+<!-- Tab bar -->
+<div class="tab-bar">
+  <div class="tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+    📊 Dashboard <span class="tab-badge" id="dashBadge">0</span>
+  </div>
+  <div class="tab" data-tab="table" onclick="switchTab('table')">
+    📋 Enrichment Table <span class="tab-badge" id="tblBadge">0</span>
+  </div>
+</div>
+
+<!-- Enrichment controls (always visible) -->
+<div class="enrich-strip">
+  <span class="label">Enrichment</span>
+  <button class="btn-e teal" id="btnEnrichAll" onclick="enrichAll()">✨ Polish All Observations</button>
+  <button class="btn-e" onclick="rerollAll()">🔀 Re-word All</button>
+  <div style="flex:1;"></div>
+  <span class="label" style="color:var(--muted);">Use the Export ▾ dropdown in the toolbar above</span>
+</div>
+
+<!-- ══════════════ DASHBOARD PANEL ══════════════ -->
+<div class="panel active" id="panel-dashboard">
+<div class="wrap">
+
+  <!-- KPI cards -->
+  <div class="kpi-row">
+    <div class="kpi k-total" data-icon="📋"><div class="n" id="k_total">0</div><div class="l">Total</div><div class="pct" id="k_total_pct">findings</div></div>
+    <div class="kpi k-crit"  data-icon="🔴"><div class="n" id="k_crit">0</div><div class="l">Critical</div><div class="pct" id="k_crit_pct">0%</div></div>
+    <div class="kpi k-high"  data-icon="🟠"><div class="n" id="k_high">0</div><div class="l">High</div><div class="pct" id="k_high_pct">0%</div></div>
+    <div class="kpi k-med"   data-icon="🟡"><div class="n" id="k_med">0</div><div class="l">Medium</div><div class="pct" id="k_med_pct">0%</div></div>
+    <div class="kpi k-low"   data-icon="🟢"><div class="n" id="k_low">0</div><div class="l">Low</div><div class="pct" id="k_low_pct">0%</div></div>
+    <div class="kpi k-open"  data-icon="📂"><div class="n" id="k_open">0</div><div class="l">Open</div><div class="pct" id="k_open_pct">0%</div></div>
+    <div class="kpi k-done"  data-icon="✅"><div class="n" id="k_done">0</div><div class="l">Resolved</div><div class="pct" id="k_done_pct">0%</div></div>
+    <div class="kpi k-photo" data-icon="📷"><div class="n" id="k_photo">0</div><div class="l">With Photos</div><div class="pct" id="k_photo_pct">0%</div></div>
+  </div>
+
+  <!-- Row 1: Severity · Category · Finding Type -->
+  <div class="section-hdr"><h2>Severity &amp; Classification</h2><span class="sec-hint">Distribution of all findings</span></div>
+  <div class="chart-grid-3">
+    <div class="chart-card">
+      <h3>Severity Distribution</h3>
+      <div class="chart-sub">Critical → Low breakdown</div>
+      <div class="chart-wrap h220"><canvas id="cSev"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Category Breakdown</h3>
+      <div class="chart-sub">Top categories by finding count</div>
+      <div class="chart-wrap h220"><canvas id="cCat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Finding Type</h3>
+      <div class="chart-sub">Unsafe Act / Condition / Near Miss…</div>
+      <div class="chart-wrap h220"><canvas id="cType"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 2: Risk Matrix · Status Progress · Severity by Category stacked -->
+  <div class="section-hdr"><h2>Risk &amp; Status</h2><span class="sec-hint">Risk matrix and closure progress</span></div>
+  <div class="chart-grid-3">
+    <div class="chart-card">
+      <h3>Risk Matrix</h3>
+      <div class="chart-sub">Likelihood × Consequence</div>
+      <div id="rmWrap">
+        <div class="rm-grid" id="rmGrid" style="margin-bottom:4px;"></div>
+        <div class="rm-axis">← Consequence →</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <h3>Status Overview</h3>
+      <div class="chart-sub">Open · In Progress · Resolved</div>
+      <div class="chart-wrap h180" style="margin-bottom:14px;"><canvas id="cStatus"></canvas></div>
+      <div class="prog-list" id="progList"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Severity by Category</h3>
+      <div class="chart-sub">Stacked by severity level</div>
+      <div class="chart-wrap h260"><canvas id="cSevByCat"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Top Locations · Timeline · Responsible persons -->
+  <div class="section-hdr"><h2>Location &amp; Timeline</h2><span class="sec-hint">Where and when findings occurred</span></div>
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <h3>Top Locations by Finding Count</h3>
+      <div class="chart-sub">Ranked by number of findings</div>
+      <div class="chart-wrap h260"><canvas id="cLoc"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Findings Over Time</h3>
+      <div class="chart-sub">Cumulative findings by capture date</div>
+      <div class="chart-wrap h260"><canvas id="cTimeline"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 4: Responsible persons · Severity radar -->
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <h3>Responsible Persons — Workload</h3>
+      <div class="chart-sub">Open findings assigned per person</div>
+      <div class="chart-wrap h240"><canvas id="cResp"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>HSE Parameter Radar</h3>
+      <div class="chart-sub">Coverage across all HSE parameters</div>
+      <div class="chart-wrap h240"><canvas id="cRadar"></canvas></div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+</div><!-- /panel-dashboard -->
+
+<!-- ══════════════ TABLE PANEL ══════════════ -->
+<div class="panel" id="panel-table">
+<div class="enrich-strip" style="border-top:1px solid var(--line);">
+  <div class="enriching-banner" id="enrichBanner" style="flex:1;">
+    <div class="spin"></div> Enriching findings…
+  </div>
+</div>
+<div class="wrap" style="padding-top:10px;">
+  <div class="tbl-card">
+    <div class="tbl-head">
+      <h2>Enriched Findings</h2>
+      <div class="th-sp"></div>
+      <input type="text" id="fltSearch" placeholder="🔍 Search…" style="width:160px;">
+      <select class="flt" id="fltSev">
+        <option value="">All severities</option>
+        <option>Critical</option><option>High</option><option>Medium</option><option>Low</option>
+      </select>
+      <select class="flt" id="fltStatus">
+        <option value="">All statuses</option>
+        <option>Open</option><option>In Progress</option><option>Resolved</option>
+      </select>
+    </div>
+    <div id="tblContent">
+      <div class="empty-state">
+        <div class="ico">🔬</div>
+        <h3>No findings yet</h3>
+        <p>Send findings from Stage 2 to begin enrichment and export.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</div><!-- /panel-table -->
+
+<div class="lightbox" id="lb" onclick="closeLb()">
+  <button class="lb-close">×</button>
+  <img id="lbImg" src="" alt="">
+</div>
+<div class="toast-wrap"><div class="toast-item" id="toast"></div></div>
+<input type="file" id="photoUploader" accept="image/*" style="display:none">
+
+<script>
+'use strict';
+
+const STORE = 'snapaudit_s3_v1';
+let rows = [], meta = {}, seed = Date.now();
+let photoTargetIdx = -1;
+const charts = {};
+
+/* ══ Tab switching ══ */
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  if (name === 'dashboard') renderDashboard();
+}
+
+/* ══ Persist ══ */
+function persist() {
+  try { localStorage.setItem(STORE, JSON.stringify({ rows, meta, seed })); } catch {}
+}
+function loadPersisted() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (d) { rows = d.rows || []; meta = d.meta || {}; seed = d.seed || Date.now(); }
+  } catch {}
+}
+
+/* ══ Toast ══ */
+let tt;
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast-item show' + (type ? ' ' + type : '');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ══ Update badges ══ */
+function updateBadges() {
+  const n = rows.length;
+  document.getElementById('dashBadge').textContent = n;
+  document.getElementById('tblBadge').textContent  = n;
+}
+
+/* ══════════════════════════════════════════════
+   ENRICHMENT ENGINE
+   Style : Senior HSE Auditor — Industrial Audit Report
+   Standards : Factories Act 1948, NBC 2016, IS Codes, PESO, EPA 1986
+   ══════════════════════════════════════════════ */
+const E = (() => {
+  const PARAMS = ['Electrical Safety','Fire Protection','Mechanical Integrity','Civil & Structural',
+    'Housekeeping & Order','PPE Compliance','Environmental Control','Chemical & Hazmat Management',
+    'Ergonomics & Manual Handling','Emergency Preparedness','Working at Height','Permit to Work',
+    'Confined Space','HSE Management System','Contractor Safety','Road & Traffic Safety'];
+
+  const LEGAL_DB = {
+    'Electrical Safety': [
+      'Factories Act, 1948 – Section 36 & Section 36A; IS 732:1989 – Code of Practice for Electrical Wiring Installations; IS 3043:2018 – Code of Practice for Earthing; Central Electricity Authority (Safety) Regulations, 2010 – Regulation 29 & 30',
+      'IE Rules, 1956 – Rule 50 & 51 (Earthing); IS 694:2010 – PVC Insulated Cables; NBC 2016 Part 8 – Building Services (Electrical); Factories Act, 1948 – Section 36 & Schedule III',
+      'Factories Act, 1948 – Section 36; IS 5216 (Parts 1 & 2) – Safety Procedures for Electrical Installations; IS 3043:2018 – Earthing; Central Electricity Authority (Safety) Regulations, 2010'
+    ],
+    'Fire Protection': [
+      'Factories Act, 1948 – Section 38 (Precautions in case of fire); NBC 2016 Part 4 – Fire and Life Safety; IS 2190:2010 – Selection, Installation and Maintenance of First-Aid Fire Extinguishers',
+      'NBC 2016 Part 4 – Fire Protection; IS 15105:2002 – Design and Installation of Fixed Automatic Sprinkler Systems; Petroleum Act, 1934; TAC Fire Protection Manual',
+      'Factories Act, 1948 – Section 38 & 39; IS 1641:1988 – Code of Practice for Fire Safety of Buildings; PESO Guidelines for Storage of Flammable Materials; IS 13947 – LV Switchgear & Control Gear'
+    ],
+    'Mechanical Integrity': [
+      'Factories Act, 1948 – Section 21 (Fencing of machinery) & Section 22 (Work on or near machinery in motion); IS 13871:1993 – Safety of Machinery; IS 11016:1984 – Specification for Machine Guards',
+      'Factories Act, 1948 – Section 29 (Lifting machines, chains, ropes and lifting tackle) & Section 30 (Revolving machinery); IS 3177:2009 – Code of Practice for EOT Cranes; BOCW Act, 1996 – Schedule III',
+      'Factories Act, 1948 – Section 31 (Pressure plant); The Boilers Act, 1923; IS 2825:1969 – Code of Unfired Pressure Vessels; IS 7938:1976 – Code of Practice for Maintenance of Industrial Equipment'
+    ],
+    'Civil & Structural': [
+      'Factories Act, 1948 – Section 33 & Section 16; NBC 2016 Part 6 – Structural Design; IS 456:2000 – Code of Practice for Plain and Reinforced Concrete; BOCW Act, 1996',
+      'BOCW Act, 1996 & Central Rules, 1998 – Rule 67 (Scaffolding); IS 3696 (Parts 1 & 2) – Safety Code for Scaffolds and Ladders; NBC 2016 Part 4 Section 4 – Means of Egress',
+      'Factories Act, 1948 – Section 33A; IS 4130:1991 – Demolition of Buildings – Code of Safety; NBC 2016 Part 3 – Development Control Rules and General Building Requirements'
+    ],
+    'Housekeeping & Order': [
+      'Factories Act, 1948 – Section 11 (Cleanliness), Section 12 (Disposal of wastes and effluents) & Section 14 (Ventilation and temperature); IS 14489:1998 – Code of Practice on OH&S Audit',
+      'Factories Act, 1948 – Section 11 & Section 42 (Facilities for washing); ISO 45001:2018 – Clause 8.1 (Operational Planning and Control); IS 14489:1998 – OH&S Audit',
+      'Factories Act, 1948 – Section 11 (Cleanliness) & Section 16 (Precautions against fire); NBC 2016 – General Building Requirements; IS 9672:1980 – Code of Practice for Storage of Petroleum Products'
+    ],
+    'PPE Compliance': [
+      'Factories Act, 1948 – Section 35 (Protection of eyes) & Model Factory Rules – Rule 65; IS 4151:2015 – Protective Helmets; IS 15071:2002 – Safety Footwear; IS 6519:1971 – Safety Harnesses',
+      'Factories Act, 1948 – Section 35 & Section 87 (Dangerous operations); IS 14255:2016 – High Visibility Vests; IS 9167:1979 – Ear Protectors; IS 5983:1980 – Eye Protectors',
+      'Factories Act, 1948 – Section 35; Model Rules – Rule 65 & 66; IS 4151:2015 – Industrial Safety Helmets; IS 15071:2002 – Safety Footwear; Mines Act, 1952 – Section 22 & 23'
+    ],
+    'Environmental Control': [
+      'Environment Protection Act, 1986 – Section 7 (Persons handling hazardous substances); Environment Protection Rules, 1986 – Rule 3 & 5; Hazardous Waste (Management, Handling and Transboundary Movement) Rules, 2008',
+      'Water (Prevention and Control of Pollution) Act, 1974; Air (Prevention and Control of Pollution) Act, 1981; Environment Protection Act, 1986 – Schedule I (Standards for Emission or Discharge)',
+      'Hazardous Waste (Management) Rules, 2016; Environment Protection Act, 1986 – Section 6 & 7; ISO 14001:2015 – Clause 6.1.2 (Environmental Aspects); Factories Act, 1948 – Section 12'
+    ],
+    'Chemical & Hazmat Management': [
+      'Manufacture, Storage and Import of Hazardous Chemical Rules, 1989 – Rule 4 & 5; PESO Regulations; Factories Act, 1948 – Section 41B (Compulsory disclosure of information)',
+      'Static and Mobile Pressure Vessels (Unfired) Rules, 1981; PESO – Gas Cylinder Rules, 2016; Explosives Act, 1884; Petroleum Act, 1934 & Petroleum Rules, 2002; Factories Act, 1948 – Section 36',
+      'Manufacture, Storage and Import of Hazardous Chemical Rules, 1989; Public Liability Insurance Act, 1991; Environment Protection Act, 1986; IS 1446:1985 – Safety Colours and Safety Signs'
+    ],
+    'Ergonomics & Manual Handling': [
+      'Factories Act, 1948 – Section 33 (Excessive weights) & Section 34; IS 14056:2013 – Manual Handling of Loads; IS 13388:1992 – Ergonomic Guidelines for Visual Display Terminals',
+      'Factories Act, 1948 – Section 33 & Model Rules – Rule 56 (Precautions against excessive weights); ISO 11228-1:2003 – Ergonomics – Manual Handling; IS 14489:1998 – OH&S Audit Guidelines',
+      'Factories Act, 1948 – Section 33; BOCW Act, 1996 – Schedule III; IS 14056:2013 – Code of Practice on Manual Handling; Model Rules under the Factories Act – Chapter III'
+    ],
+    'Emergency Preparedness': [
+      'Factories Act, 1948 – Section 41B (Disaster Management Plan) & Section 45 (First-Aid); Model Rules – Rule 73 (First-Aid Appliances); Disaster Management Act, 2005',
+      'Factories Act, 1948 – Section 41B & 41C (Emergency planning); IS 15656:2006 – Hazard Identification and Risk Analysis; NBC 2016 Part 4 – Fire Escape and Emergency Evacuation',
+      'Factories Act, 1948 – Section 45 & 46 (First-Aid); IS 15656:2006 – HIRA; BOCW Act, 1996 – Rule 225; NBC 2016 – Clause 5 (Means of Egress & Emergency Lighting)'
+    ],
+    'Working at Height': [
+      'Factories Act, 1948 – Section 33A & Model Rules – Rule 65(A); BOCW Act, 1996 & Central Rules, 1998 – Rule 67 (Scaffolding); IS 3696 (Part 1):1987 – Safety Code for Scaffolds; IS 3696 (Part 2):1991 – Safety Code for Ladders',
+      'BOCW Act, 1996 – Rule 70; IS 6519:1971 – Code of Practice for Safety Belts & Harnesses; NBC 2016 Part 4 – Section 4 (Fall Protection); Factories Act, 1948 – Section 33A',
+      'Factories Act, 1948 – Section 33A; BOCW Central Rules, 1998 – Rule 67 & 68; IS 3696 – Scaffolds and Ladders (Safety Code); IS 6519:1971 – Safety Harnesses'
+    ],
+    'Permit to Work': [
+      'Factories Act, 1948 – Section 36A (Precautions against dangerous fumes); IS 15656:2006 – Hazard Identification & Risk Analysis; OISD Standard 105 – Work Permit System',
+      'Factories Act, 1948 – Section 41B; OISD Standard 105 – Work Permit System; IS 15656:2006 – HIRA; Model Rules – Hot Work, Confined Space and Electrical Isolation Procedures',
+      'Factories Act, 1948 – Section 38 & 36A; OISD Standard 105; IS 14489:1998 – OH&S Audit; Model Rules – Chapter VII (Hazardous Process Rules)'
+    ],
+    'Confined Space': [
+      'Factories Act, 1948 – Section 36A (Precautions against dangerous fumes and gases); OISD Standard 105 (Confined Space Entry); Model Factory Rules – Rule 113 & 114 (Entry into Confined Spaces)',
+      'Factories Act, 1948 – Section 36A; IS 15656:2006 – HIRA; Model Factory Rules – Rule 113 (Certificate before Entry); OISD Standard 105 – Permit to Work',
+      'Factories Act, 1948 – Section 36 & 36A; OISD Standard 105 – Confined Space Entry; IS 16024:2012 – Safety Requirements for Electrical Equipment; Model Rules – Chapter on Confined Spaces'
+    ],
+    'HSE Management System': [
+      'Factories Act, 1948 – Section 7A (General duties of the occupier) & Section 40B (Safety Officers); IS 14489:1998 – Code of Practice on OH&S Audit; ISO 45001:2018 – Clause 9.2 (Internal Audit)',
+      'Factories Act, 1948 – Section 40B & Section 41 (Power to require specifications); IS 14489:1998 – OH&S Audit; ISO 45001:2018 – Clause 10.3 (Continual Improvement)',
+      'Factories Act, 1948 – Section 7A & 41; National Policy on Safety, Health and Environment at Workplace, 2009; ISO 45001:2018 – Clause 6.1 (Risks and Opportunities); IS 15656:2006 – HIRA'
+    ],
+    'Contractor Safety': [
+      'Factories Act, 1948 – Section 41B; Contract Labour (Regulation and Abolition) Act, 1970; BOCW Act, 1996 – Chapter III (Safety, Health & Welfare of Workers)',
+      'Contract Labour (Regulation and Abolition) Act, 1970; Factories Act, 1948 – Section 7A; BOCW Act, 1996 & Central Rules, 1998 – Rule 25 (Safety Measures); ISO 45001:2018 – Clause 8.1.4',
+      'Factories Act, 1948 – Section 41B; Contract Labour Act, 1970; BOCW Act, 1996; IS 14489:1998 – OH&S Audit; NBC 2016 Part 7 – Constructional Practices and Safety'
+    ],
+    'Road & Traffic Safety': [
+      'Motor Vehicles Act, 1988 – Section 112 & 113; Central Motor Vehicles Rules, 1989; IS 17076:2019 – Road Safety Audit; Factories Act, 1948 – Section 33A',
+      'Motor Vehicles Act, 1988; Factories Act, 1948 – Section 33A; IS 4082:1996 – Stacking and Storage; OISD Standard 173 – Road Safety in the Petroleum Industry',
+      'Motor Vehicles Act, 1988 – Section 112; IS 17076:2019 – Road Safety Audit; Factories Act, 1948 – Section 7A; OISD Standard 173 – Road Safety Guidelines'
+    ]
+  };
+
+  /* ── Observation templates: formal industrial audit language per prompt ── */
+  const REFINED = {
+    Critical: [
+      'During the inspection of the subject area, it was observed that {obs}. The said condition poses an immediate and life-threatening risk to personnel in the vicinity, with the potential to result in fatality, serious injury, fire, explosion, or electrocution if left unaddressed. The observation is classified as Critical and necessitates immediate stoppage of related activities and emergency corrective intervention prior to resumption of operations.',
+      'It was observed during the walkaround audit that {obs}. This unsafe condition represents a critical non-conformance with statutory safety requirements and exposes personnel to significant hazards. The matter warrants urgent escalation to senior management for immediate closure and a formal Root Cause Analysis to prevent recurrence.',
+      'As verified during the physical inspection, {obs}. The prevailing unsafe condition, if not rectified on an immediate basis, presents a high probability of a major incident including severe injury, fatality, entanglement, or structural failure. The observation is rated Critical and requires emergency corrective action before any further work activity is permitted in the area.'
+    ],
+    High: [
+      'During the inspection, it was observed that {obs}. The said condition represents a high-priority safety deficiency with the potential to result in serious injury, fire, or operational disruption. It is essential that corrective action be initiated within 24 to 48 hours to mitigate the associated risk and prevent escalation to a major incident.',
+      'It was observed during the audit that {obs}. The identified unsafe condition, if not rectified promptly, may lead to personnel injury, equipment damage, or fire hazard. The observation is classified as High severity and requires immediate assignment to a responsible person with a defined target completion date and formal corrective action documentation.',
+      'As informed by the team and verified during inspection, {obs}. This finding reflects a significant gap in safety standards and has the potential to cause harm to personnel through falls, entanglement, electrocution, or exposure to hazardous substances. The management is advised to treat this as a high-priority action and initiate corrective measures without undue delay.'
+    ],
+    Medium: [
+      'During the inspection, it was observed that {obs}. While the condition does not present an immediate life-threatening risk, it reflects a systemic gap in safety management that, if unaddressed, may escalate to a more serious hazard over time. The observation is classified as Medium priority and corrective action is recommended within the agreed timeframe.',
+      'It was observed during the walkaround that {obs}. The said condition is indicative of inadequate maintenance or non-compliance with applicable safety standards. A responsible person should be assigned for corrective action with a defined target date, and closure should be verified through a follow-up inspection with photographic documentation.',
+      'As noted during the audit, {obs}. The observation reflects a moderate safety concern requiring structured corrective action. The management is advised to include this finding in the site HSE action register, assign ownership, and ensure closure within the stipulated timeline with documentary evidence.'
+    ],
+    Low: [
+      'During the inspection, it was observed that {obs}. The condition represents a low-severity observation with limited immediate risk; however, it reflects an area of improvement that, if addressed proactively, will contribute to a safer and more organised work environment. The observation is recommended for inclusion in the routine maintenance schedule.',
+      'It was observed that {obs}. While the associated risk level is low at this time, the management is advised to address this observation as part of continuous improvement initiatives. The relevant supervisor should be briefed, and closure should be verified during the next scheduled walkthrough inspection.',
+      'As noted during the audit, {obs}. This observation is classified as Low priority and is representative of a housekeeping or minor procedural gap. The team is encouraged to take ownership of such observations and resolve them within the normal operational cycle to reinforce a culture of proactive safety management.'
+    ]
+  };
+
+  /* ── Recommendation templates: realistic, engineering-focused, implementation-oriented ── */
+  const RECS = {
+    Critical: [
+      'It is recommended that the affected area be immediately cordoned off and a Stop Work Notice be issued by the competent authority. An emergency risk assessment shall be conducted, interim engineering controls implemented, and the matter escalated to the Plant Head and HSE Manager forthwith. Permanent corrective action must be completed and independently verified before the area is reopened. A formal Root Cause Analysis (RCA) shall be initiated to determine causal factors and prevent recurrence.',
+      'The management is advised to immediately halt all operations in the affected zone and issue a written Stop Work Authority. A dedicated corrective action team comprising the department head, maintenance engineer, and HSE officer shall be constituted. All personnel shall be briefed through an emergency toolbox talk. Permanent rectification shall be completed under a validated engineering change procedure with photographic evidence of closure submitted to the HSE department.',
+      'It is strongly recommended that work in the affected area be suspended immediately pending corrective action. Temporary barriers and isolation measures shall be implemented within two hours. A detailed RCA using the 5-Why or Fishbone methodology shall be documented. Corrective and Preventive Actions (CAPA) shall be implemented and verified by a competent HSE professional, and the findings shall be shared across all sites as a lessons-learned communication.'
+    ],
+    High: [
+      'It is recommended that the responsible department head immediately assign a competent person for corrective action with a target completion date not exceeding 48 hours. Interim controls shall be deployed without delay. A formal Corrective Action Request (CAR) shall be raised in the site HSE management system, and closure shall be verified through a physical follow-up inspection with photographic documentation submitted to the HSE department.',
+      'The management is advised to deploy interim safeguards such as barricading, hazard warning signage, or temporary isolation within 24 hours. A written corrective action plan shall be prepared by the concerned department, reviewed by the HSE Manager, and implemented within the stipulated period. A re-inspection shall be carried out upon completion to confirm the effectiveness of remedial measures.',
+      'It is recommended that the area supervisor be formally notified and directed to initiate corrective action. The HSE team shall conduct a focused risk assessment for the affected task and develop a revised Safe Work Procedure (SWP) if required. Affected personnel shall be briefed on the hazard and the interim controls in place. Closure must be documented and reported at the next HSE review meeting.'
+    ],
+    Medium: [
+      'It is recommended that the area supervisor be assigned responsibility for corrective action with a defined target date. The finding shall be logged in the site HSE action tracker and progress reviewed at the weekly safety meeting. Closure shall be confirmed through a physical inspection, and photographic evidence of the rectified condition shall be submitted to the HSE department for record-keeping.',
+      'The management is advised to include this observation in the formal HSE action register and assign it to the relevant department with a completion deadline. An awareness session or toolbox talk on the specific hazard shall be conducted for the affected workforce. The HSE officer shall carry out a follow-up inspection within 14 days to verify that corrective measures have been implemented effectively.',
+      'It is recommended that a formal observation card be issued to the area in-charge with clear details of the finding and the required corrective action. The HSE team shall schedule a follow-up inspection at the next audit cycle to verify closure. The observation and its resolution shall be documented in the site HSE management system and included in the monthly safety performance report for management review.'
+    ],
+    Low: [
+      'It is recommended that this observation be included in the routine maintenance schedule and assigned to the area team for resolution within the normal operational cycle. The finding shall be discussed during the next toolbox talk to create awareness among the workforce. The site HSE officer shall verify closure during the next scheduled walkthrough inspection.',
+      'The management is advised to include this observation in the site improvement register and assign it to the area lead for resolution within the standard maintenance timeframe. Improvements of this nature should be encouraged through positive recognition and reinforcement of a proactive safety culture on site.',
+      'It is recommended that the relevant supervisor be informed and that corrective action be scheduled as part of routine operations. The workforce shall be encouraged to self-identify and promptly address similar observations through the site near-miss and unsafe condition reporting programme. Closure shall be confirmed at the next scheduled inspection.'
+    ]
+  };
+
+  function classify(obs) {
+    obs = (obs || '').toLowerCase();
+    if (/electric|cable|wire|socket|panel|circuit|switch|fuse|earthing|mcb|wiring|busbar/.test(obs)) return 'Electrical Safety';
+    if (/fire|extinguish|smoke|sprinkler|alarm|flame|ignit|hydrant|hose reel/.test(obs)) return 'Fire Protection';
+    if (/machine|equipment|guard|belt|gear|shaft|press|pump|compressor|valve|pressure|coupling|nip point/.test(obs)) return 'Mechanical Integrity';
+    if (/floor|crack|wall|roof|structure|concrete|scaffold|civil|drain|step|stair|railing|handrail/.test(obs)) return 'Civil & Structural';
+    if (/housekeep|clean|clutter|debris|spill|waste|storage|aisle|tidy|litter|blocked/.test(obs)) return 'Housekeeping & Order';
+    if (/ppe|helmet|glove|boot|goggle|vest|harness|mask|respirator|ear|safety wear|apron/.test(obs)) return 'PPE Compliance';
+    if (/environm|emission|effluent|discharge|leak|containment|pollut|sump|bund/.test(obs)) return 'Environmental Control';
+    if (/chemical|hazmat|msds|sds|flammable|corrosive|toxic|gas cylinder|lpg|solvent/.test(obs)) return 'Chemical & Hazmat Management';
+    if (/ergon|manual|lift|carry|posture|repetitive|strain|awkward/.test(obs)) return 'Ergonomics & Manual Handling';
+    if (/height|ladder|scaffold|roof|elevated|fall|edge|opening|skylight|parapet/.test(obs)) return 'Working at Height';
+    if (/permit|ptw|hot work|isolation|lockout|tagout/.test(obs)) return 'Permit to Work';
+    if (/confined|vessel|tank|silo|manhole|pit|trench/.test(obs)) return 'Confined Space';
+    if (/emergency|first aid|evacuation|assembly|muster|rescue|fire exit|exit sign/.test(obs)) return 'Emergency Preparedness';
+    if (/contractor|subcontract/.test(obs)) return 'Contractor Safety';
+    if (/vehicle|truck|forklift|driver|traffic|parking|speed|reversing/.test(obs)) return 'Road & Traffic Safety';
+    return 'HSE Management System';
+  }
+
+  function pick(arr, i, v) { return arr[(i + v) % arr.length]; }
+
+  function enrich(r, i, v) {
+    const sev = r.severity || 'Medium';
+    const refined = pick(REFINED[sev] || REFINED.Medium, i, v).replace('{obs}', r.observation || '—');
+    const recommendation = pick(RECS[sev] || RECS.Medium, i, v);
+    const param = r.parameter || classify(r.observation);
+    const legal = pick(LEGAL_DB[param] || LEGAL_DB['HSE Management System'], i, v);
+    return { refined, recommendation, legal };
+  }
+
+  return { classify, enrich, PARAMS };
+})();
+
+/* ══ Enrich ══ */
+function enrichRow(i) {
+  const r = rows[i];
+  if (!r.parameter) r.parameter = E.classify(r.observation);
+  const e = E.enrich(r, i, seed + (r._v || 0));
+  r.refined = e.refined; r.recommendation = e.recommendation; r.legal = e.legal;
+}
+
+async function enrichAll() {
+  if (!rows.length) { toast('No findings to enrich.', 'warn'); return; }
+  document.getElementById('enrichBanner').classList.add('show');
+  document.getElementById('btnEnrichAll').disabled = true;
+  await new Promise(r => setTimeout(r, 0));
+  rows.forEach((_, i) => enrichRow(i));
+  await new Promise(r => setTimeout(r, 50));
+  document.getElementById('enrichBanner').classList.remove('show');
+  document.getElementById('btnEnrichAll').disabled = false;
+  persist(); renderTable(); renderDashboard();
+  toast(`Enriched ${rows.length} finding${rows.length !== 1 ? 's' : ''}.`, 'ok');
+}
+
+function rerollAll() {
+  if (!rows.length) { toast('No findings to re-vary.', 'warn'); return; }
+  seed++; rows.forEach(r => { if (r.refined) { r._v = 0; const i = rows.indexOf(r); enrichRow(i); } });
+  persist(); renderTable();
+  toast('Re-varied all wording.');
+}
+function rerollSingle(i) { rows[i]._v = (rows[i]._v || 0) + 1; enrichRow(i); persist(); renderTable(); }
+
+function addRow() {
+  rows.push({ id: 'F' + String(rows.length + 1).padStart(3,'0'), location: '', department: '', category: 'Other',
+    findingType: 'Unsafe Condition', severity: 'Medium', observation: '', responsiblePerson: '',
+    targetDate: '', actionRequired: '', status: 'Open', photos: [], timestamp: new Date().toISOString(),
+    parameter: 'HSE Management System', refined: '', recommendation: '', legal: '', _v: 0, likelihood: 3, consequence: 3 });
+  persist(); renderAll();
+}
+
+/* ══ Filter ══ */
+function filteredRows() {
+  const s = (document.getElementById('fltSearch').value || '').toLowerCase();
+  const sev = document.getElementById('fltSev').value;
+  const status = document.getElementById('fltStatus').value;
+  return rows.filter(r =>
+    (!s || (r.location||'').toLowerCase().includes(s) || (r.observation||'').toLowerCase().includes(s)) &&
+    (!sev || r.severity === sev) && (!status || r.status === status)
+  );
+}
+['fltSearch','fltSev','fltStatus'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener(el.tagName === 'INPUT' ? 'input' : 'change', () => renderTable());
+});
+
+function delRow(i) { rows.splice(i, 1); persist(); renderAll(); toast('Row deleted.'); }
+function upd(i, k, v) { rows[i][k] = v; if (['observation','severity','parameter','location'].includes(k)) { const r = rows[i]; if (r.refined) enrichRow(i); } persist(); renderKPIs(); }
+function updSev(i, sel) { upd(i, 'severity', sel.value); sel.className = 'sev-' + sel.value; renderKPIs(); }
+function updSt(i, sel) { rows[i].status = sel.value; sel.className = 'st-' + sel.value.replace(' ',''); persist(); renderKPIs(); }
+
+/* ══ Render all ══ */
+function renderAll() { renderKPIs(); renderTable(); updateBadges(); renderDashboard(); }
+
+/* ══ KPIs ══ */
+function renderKPIs() {
+  const n = rows.length;
+  const cnts = { Critical:0, High:0, Medium:0, Low:0 };
+  let open = 0, done = 0, photo = 0;
+  rows.forEach(r => {
+    cnts[r.severity] = (cnts[r.severity]||0) + 1;
+    if (r.status === 'Resolved') done++; else open++;
+    if (r.photos && r.photos.length) photo++;
+  });
+  const pct = x => n ? Math.round(x/n*100)+'%' : '0%';
+  document.getElementById('k_total').textContent = n;
+  document.getElementById('k_total_pct').textContent = 'total findings';
+  document.getElementById('k_crit').textContent = cnts.Critical || 0;  document.getElementById('k_crit_pct').textContent = pct(cnts.Critical);
+  document.getElementById('k_high').textContent = cnts.High || 0;      document.getElementById('k_high_pct').textContent = pct(cnts.High);
+  document.getElementById('k_med').textContent  = cnts.Medium || 0;    document.getElementById('k_med_pct').textContent  = pct(cnts.Medium);
+  document.getElementById('k_low').textContent  = cnts.Low || 0;       document.getElementById('k_low_pct').textContent  = pct(cnts.Low);
+  document.getElementById('k_open').textContent = open;                 document.getElementById('k_open_pct').textContent = pct(open);
+  document.getElementById('k_done').textContent = done;                 document.getElementById('k_done_pct').textContent = pct(done);
+  document.getElementById('k_photo').textContent = photo;               document.getElementById('k_photo_pct').textContent = pct(photo);
+  updateBadges();
+}
+
+/* ══════════════ DASHBOARD ══════════════ */
+const SEV_C   = { Critical:'#7b1818', High:'#c0392b', Medium:'#d97706', Low:'#2e8b57' };
+const SEV_BG  = { Critical:'#fde8e8', High:'#fdf0ef', Medium:'#fef3cd', Low:'#e6f4ec' };
+const CAT_PAL = ['#183934','#2e8b57','#1e6fa8','#d97706','#7b1818','#8b2fc9','#c0392b','#5d7a76','#4d9f78','#a07030','#555','#2980b9'];
+const TYPE_C  = { 'Unsafe Condition':'#c0392b','Unsafe Act':'#d97706','Near Miss':'#f59e0b','Positive Observation':'#2e8b57','Improvement Opportunity':'#1e6fa8' };
+const ST_C    = { 'Open':'#d97706','In Progress':'#1e6fa8','Resolved':'#2e8b57' };
+
+function destroyChart(key) { if (charts[key]) { try { charts[key].destroy(); } catch {} delete charts[key]; } }
+
+function renderDashboard() {
+  if (!rows.length) return;
+  renderKPIs();
+  renderSevChart();
+  renderCatChart();
+  renderTypeChart();
+  renderRiskMatrix();
+  renderStatusChart();
+  renderSevByCat();
+  renderLocChart();
+  renderTimeline();
+  renderRespChart();
+  renderRadar();
+}
+
+/* Severity doughnut */
+function renderSevChart() {
+  destroyChart('sev');
+  const cnts = { Critical:0, High:0, Medium:0, Low:0 };
+  rows.forEach(r => cnts[r.severity] = (cnts[r.severity]||0)+1);
+  charts.sev = new Chart(document.getElementById('cSev'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(cnts), datasets: [{ data: Object.values(cnts), backgroundColor: Object.keys(cnts).map(k=>SEV_C[k]), borderColor: '#fff', borderWidth: 3 }] },
+    options: { cutout: '68%', plugins: { legend: { position: 'bottom', labels: { font:{size:11}, padding:10, usePointStyle:true } } } }
+  });
+}
+
+/* Category horizontal bar */
+function renderCatChart() {
+  destroyChart('cat');
+  const cnts = {};
+  rows.forEach(r => cnts[r.category||'Other'] = (cnts[r.category||'Other']||0)+1);
+  const sorted = Object.entries(cnts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  charts.cat = new Chart(document.getElementById('cCat'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(x => x[0].length > 20 ? x[0].slice(0,20)+'…' : x[0]),
+      datasets: [{ data: sorted.map(x=>x[1]), backgroundColor: sorted.map((_,i)=>CAT_PAL[i%CAT_PAL.length]), borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend:{display:false} },
+      scales: { x: { grid:{color:'#f0f0f0'}, ticks:{font:{size:10}} }, y: { ticks:{font:{size:10}} } }
+    }
+  });
+}
+
+/* Finding type polar/pie */
+function renderTypeChart() {
+  destroyChart('type');
+  const cnts = {};
+  rows.forEach(r => cnts[r.findingType||'Other'] = (cnts[r.findingType||'Other']||0)+1);
+  charts.type = new Chart(document.getElementById('cType'), {
+    type: 'polarArea',
+    data: {
+      labels: Object.keys(cnts),
+      datasets: [{ data: Object.values(cnts), backgroundColor: Object.keys(cnts).map(k=>(TYPE_C[k]||'#aaa')+'cc'), borderColor: '#fff', borderWidth: 2 }]
+    },
+    options: { plugins: { legend: { position: 'bottom', labels: { font:{size:10}, padding:8, usePointStyle:true } } }, scales: { r: { ticks:{display:false}, grid:{color:'#e8e8e8'} } } }
+  });
+}
+
+/* Status doughnut + progress bars */
+function renderStatusChart() {
+  destroyChart('status');
+  const cnts = { 'Open':0, 'In Progress':0, 'Resolved':0 };
+  rows.forEach(r => cnts[r.status||'Open'] = (cnts[r.status||'Open']||0)+1);
+  charts.status = new Chart(document.getElementById('cStatus'), {
+    type: 'doughnut',
+    data: { labels: Object.keys(cnts), datasets: [{ data: Object.values(cnts), backgroundColor: Object.keys(cnts).map(k=>ST_C[k]), borderColor:'#fff', borderWidth:3 }] },
+    options: { cutout:'65%', plugins: { legend:{display:false} } }
+  });
+  const total = rows.length || 1;
+  document.getElementById('progList').innerHTML = Object.entries(cnts).map(([k,v]) => `
+    <div class="prog-item">
+      <div class="prog-header"><span style="color:${ST_C[k]};font-weight:700;">${k}</span><span>${v} <span style="color:var(--muted);">(${Math.round(v/total*100)}%)</span></span></div>
+      <div class="prog-bar"><div class="prog-fill" style="width:${Math.round(v/total*100)}%;background:${ST_C[k]};"></div></div>
+    </div>`).join('');
+}
+
+/* Severity by category stacked bar */
+function renderSevByCat() {
+  destroyChart('sevByCat');
+  const cats = [...new Set(rows.map(r => r.category||'Other'))].slice(0,8);
+  const sevs = ['Critical','High','Medium','Low'];
+  const datasets = sevs.map(sev => ({
+    label: sev,
+    data: cats.map(cat => rows.filter(r=>(r.category||'Other')===cat && r.severity===sev).length),
+    backgroundColor: SEV_C[sev], borderRadius: 3
+  }));
+  charts.sevByCat = new Chart(document.getElementById('cSevByCat'), {
+    type: 'bar',
+    data: { labels: cats.map(c=>c.length>14?c.slice(0,14)+'…':c), datasets },
+    options: {
+      plugins: { legend:{position:'bottom', labels:{font:{size:10}, usePointStyle:true}} },
+      scales: {
+        x: { stacked:true, ticks:{font:{size:9}} },
+        y: { stacked:true, ticks:{font:{size:10}}, grid:{color:'#f0f0f0'} }
+      }
+    }
+  });
+}
+
+/* Top locations bar */
+function renderLocChart() {
+  destroyChart('loc');
+  const cnts = {};
+  rows.forEach(r => cnts[r.location||'Unknown'] = (cnts[r.location||'Unknown']||0)+1);
+  const sorted = Object.entries(cnts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  charts.loc = new Chart(document.getElementById('cLoc'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(x=>x[0].length>22?x[0].slice(0,22)+'…':x[0]),
+      datasets: [{ label: 'Findings', data: sorted.map(x=>x[1]), backgroundColor: sorted.map((_,i)=>`hsl(${170-i*8},60%,${30+i*3}%)`), borderRadius: 6 }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:'#f0f0f0'},ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} }
+    }
+  });
+}
+
+/* Timeline line chart */
+function renderTimeline() {
+  destroyChart('timeline');
+  const byDate = {};
+  rows.forEach(r => {
+    const d = (r.timestamp||'').slice(0,10);
+    if (d) byDate[d] = (byDate[d]||0)+1;
+  });
+  const dates = Object.keys(byDate).sort();
+  let cum = 0; const cumData = dates.map(d => { cum += byDate[d]; return cum; });
+  charts.timeline = new Chart(document.getElementById('cTimeline'), {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [
+        { label: 'Cumulative', data: cumData, borderColor:'#183934', backgroundColor:'rgba(24,57,52,.12)', fill:true, tension:.4, pointRadius:4, pointBackgroundColor:'#183934' },
+        { label: 'Per Day', data: dates.map(d=>byDate[d]), borderColor:'#EFC71D', backgroundColor:'transparent', tension:.4, pointRadius:3, pointBackgroundColor:'#EFC71D', borderDash:[4,3] }
+      ]
+    },
+    options: {
+      plugins:{ legend:{position:'top', labels:{font:{size:10}, usePointStyle:true}} },
+      scales:{ x:{ticks:{font:{size:9},maxRotation:45}}, y:{grid:{color:'#f0f0f0'},ticks:{font:{size:10}}} }
+    }
+  });
+}
+
+/* Responsible persons bar */
+function renderRespChart() {
+  destroyChart('resp');
+  const cnts = {};
+  rows.filter(r=>r.status!=='Resolved').forEach(r => {
+    const p = r.responsiblePerson || 'Unassigned';
+    cnts[p] = (cnts[p]||0)+1;
+  });
+  const sorted = Object.entries(cnts).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  if (!sorted.length) return;
+  charts.resp = new Chart(document.getElementById('cResp'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(x=>x[0].length>20?x[0].slice(0,20)+'…':x[0]),
+      datasets: [{ label: 'Open findings', data: sorted.map(x=>x[1]), backgroundColor: sorted.map((_,i)=>`hsl(${210-i*15},60%,${40+i*2}%)`), borderRadius: 6 }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins:{legend:{display:false}},
+      scales:{ x:{grid:{color:'#f0f0f0'},ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} }
+    }
+  });
+}
+
+/* HSE parameter radar */
+function renderRadar() {
+  destroyChart('radar');
+  const paramCnts = {};
+  E.PARAMS.forEach(p => paramCnts[p] = 0);
+  rows.forEach(r => { const p = r.parameter || E.classify(r.observation||''); paramCnts[p] = (paramCnts[p]||0)+1; });
+  const active = E.PARAMS.filter(p=>paramCnts[p]>0);
+  if (active.length < 3) return;
+  charts.radar = new Chart(document.getElementById('cRadar'), {
+    type: 'radar',
+    data: {
+      labels: active.map(p=>p.length>16?p.slice(0,16)+'…':p),
+      datasets: [{
+        label: 'Findings', data: active.map(p=>paramCnts[p]),
+        backgroundColor:'rgba(24,57,52,.18)', borderColor:'#183934', pointBackgroundColor:'#EFC71D',
+        pointBorderColor:'#183934', borderWidth: 2, pointRadius: 4
+      }]
+    },
+    options: {
+      plugins:{legend:{display:false}},
+      scales:{ r:{ grid:{color:'#e0eded'}, angleLines:{color:'#d0ddd9'}, ticks:{font:{size:9},backdropColor:'transparent'}, pointLabels:{font:{size:9}} } }
+    }
+  });
+}
+
+/* Risk Matrix */
+function renderRiskMatrix() {
+  const counts = {};
+  rows.forEach(r => {
+    const k = `${r.likelihood||3},${r.consequence||3}`;
+    counts[k] = (counts[k]||0)+1;
+  });
+  const LIKE = [5,4,3,2,1];
+  const CONS = [1,2,3,4,5];
+  const score = (l,c) => l*c;
+  const bg = (l,c) => { const s=score(l,c); if(s>=15)return'#fde8e8'; if(s>=9)return'#fef3cd'; if(s>=4)return'#fff9e6'; return'#e6f4ec'; };
+  const fc = (l,c) => { const s=score(l,c); if(s>=15)return'#7b1818'; if(s>=9)return'#d97706'; if(s>=4)return'#a07030'; return'#2e8b57'; };
+  const grid = document.getElementById('rmGrid');
+  grid.innerHTML = '';
+  // corner
+  const corner = document.createElement('div'); corner.style.height='22px'; grid.appendChild(corner);
+  CONS.forEach(c => { const h=document.createElement('div'); h.className='rm-lbl-x'; h.textContent=c; h.style.fontSize='9px'; grid.appendChild(h); });
+  LIKE.forEach(l => {
+    const yl=document.createElement('div'); yl.className='rm-lbl-y'; yl.textContent=l; grid.appendChild(yl);
+    CONS.forEach(c => {
+      const cell=document.createElement('div'); cell.className='rm-cell';
+      const cnt=counts[`${l},${c}`]||0;
+      cell.style.background=bg(l,c); cell.style.color=fc(l,c);
+      cell.style.border=cnt?`2px solid ${fc(l,c)}`:'1px solid #e0e0e0';
+      cell.textContent=cnt||''; if(cnt) cell.title=`L${l}×C${c}: ${cnt} finding${cnt!==1?'s':''}`;
+      grid.appendChild(cell);
+    });
+  });
+}
+
+/* ══ Table render ══ */
+function renderTable() {
+  const visible = filteredRows();
+  const content = document.getElementById('tblContent');
+  if (!visible.length) {
+    content.innerHTML = `<div class="empty-state"><div class="ico">${rows.length?'🔍':'🔬'}</div>
+      <h3>${rows.length?'No matches':'No findings yet'}</h3>
+      <p>${rows.length?'Try adjusting filters.':'Send findings from Stage 2.'}</p></div>`;
+    return;
+  }
+  const tbl = document.createElement('table'); tbl.className = 'obs-table';
+  tbl.innerHTML = `<thead><tr>
+    <th style="width:40px;">#</th><th style="width:110px;">Location</th>
+    <th style="width:130px;">Parameter</th>
+    <th style="min-width:220px;">Raw Observation / Polished Audit Note</th>
+    <th style="min-width:190px;">Recommendation</th>
+    <th style="width:160px;">Legal / Regulatory Reference</th>
+    <th style="width:90px;">Severity</th>
+    <th style="width:100px;">Status</th>
+    <th style="width:78px;">Photo</th>
+    <th style="width:54px;"></th>
+  </tr></thead>`;
+  const tbody = document.createElement('tbody');
+  visible.forEach((r, i) => {
+    const gi = rows.indexOf(r);
+    const paramSel = E.PARAMS.map(p=>`<option value="${p}"${p===r.parameter?' selected':''}>${p}</option>`).join('');
+    const photoHtml = (r.photos&&r.photos[0])
+      ? `<img class="thumb" src="${r.photos[0]}" onclick="openLb('${r.photos[0]}')">`
+      : `<div class="ph-empty" onclick="triggerPhoto(${gi})">📷</div>`;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="sn">${i+1}</td>
+      <td><input type="text" value="${esc(r.location)}" onchange="upd(${gi},'location',this.value)" placeholder="Location"></td>
+      <td><select onchange="upd(${gi},'parameter',this.value)">${paramSel}</select></td>
+      <td>
+        <div class="raw-lbl">Raw observation (from field)</div>
+        <input type="text" value="${esc(r.observation)}" onchange="upd(${gi},'observation',this.value)">
+        <div class="raw-lbl" style="margin-top:5px;">Polished audit note</div>
+        <textarea onchange="upd(${gi},'refined',this.value)">${esc(r.refined||'')}</textarea>
+        <button class="reroll-btn" onclick="rerollSingle(${gi})">🔀 Re-word</button>
+      </td>
+      <td><textarea onchange="upd(${gi},'recommendation',this.value)">${esc(r.recommendation||'')}</textarea></td>
+      <td><textarea onchange="upd(${gi},'legal',this.value)">${esc(r.legal||'')}</textarea></td>
+      <td><select class="sev-${r.severity}" onchange="updSev(${gi},this)">
+        ${['Critical','High','Medium','Low'].map(s=>`<option ${s===r.severity?'selected':''}>${s}</option>`).join('')}
+      </select></td>
+      <td>
+        <select class="st-${(r.status||'Open').replace(' ','')}" onchange="updSt(${gi},this)">
+          ${['Open','In Progress','Resolved'].map(s=>`<option ${s===r.status?'selected':''}>${s}</option>`).join('')}
+        </select>
+        ${r.responsiblePerson?`<div style="font-size:10px;color:var(--muted);margin-top:3px;">👤 ${esc(r.responsiblePerson)}</div>`:''}
+        ${r.targetDate?`<div style="font-size:10px;color:var(--muted);">📅 ${r.targetDate}</div>`:''}
+      </td>
+      <td>${photoHtml}</td>
+      <td><button class="del-btn" onclick="delRow(${gi})">🗑</button></td>`;
+    tbody.appendChild(tr);
+  });
+  tbl.appendChild(tbody); content.innerHTML = ''; content.appendChild(tbl);
+}
+
+/* ══ Photo ══ */
+function triggerPhoto(i) { photoTargetIdx=i; document.getElementById('photoUploader').click(); }
+document.getElementById('photoUploader').addEventListener('change', async function() {
+  const file=this.files?.[0]; this.value='';
+  if(!file||photoTargetIdx<0) return;
+  const b64=await compressImg(file);
+  if(!rows[photoTargetIdx].photos) rows[photoTargetIdx].photos=[];
+  rows[photoTargetIdx].photos[0]=b64; persist(); renderTable();
+});
+function compressImg(file) {
+  return new Promise(res=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{let w=img.width,h=img.height,M=800;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}
+        const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',.78));};
+      img.src=e.target.result;};
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ══ Lightbox ══ */
+function openLb(src){document.getElementById('lbImg').src=src;document.getElementById('lb').classList.add('show');}
+function closeLb(){document.getElementById('lb').classList.remove('show');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLb();});
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ══════════════════════════════════════════
+   EXPORTS
+   ══════════════════════════════════════════ */
+
+/* Stage 1 Excel */
+async function exportStage1Excel() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  toast('Building Stage 1 Excel…');
+  const wb=new ExcelJS.Workbook(); wb.creator='SnapAudit'; wb.created=new Date();
+  const ws=wb.addWorksheet('Stage 1 – Field Capture',{tabColor:{argb:'FF183934'}});
+  ws.columns=[{header:'ID',key:'id',width:10},{header:'Timestamp',key:'ts',width:22},{header:'Location',key:'loc',width:35},{header:'Observation',key:'obs',width:60},{header:'Photos',key:'ph',width:12}];
+  const hf={type:'pattern',pattern:'solid',fgColor:{argb:'FF183934'}};
+  ws.getRow(1).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle'};});
+  ws.getRow(1).height=22;
+  rows.forEach(r=>{const row=ws.addRow({id:r.id,ts:r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'',loc:r.location||'',obs:r.observation||'',ph:(r.photos&&r.photos.length)||0});row.alignment={wrapText:true,vertical:'top'};row.height=32;});
+  ws.autoFilter={from:'A1',to:'E1'};
+  const buf=await wb.xlsx.writeBuffer();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download=`SnapAudit-Stage1-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();
+  toast('Stage 1 Excel saved.','ok');
+}
+
+function exportStage1JSON() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  const payload={version:'snapaudit-v1',stage:1,meta,exportedAt:new Date().toISOString(),findings:rows.map(r=>({id:r.id,timestamp:r.timestamp,location:r.location,observation:r.observation,photos:r.photos||[]}))};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download=`SnapAudit-Stage1-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  toast('Stage 1 JSON saved.','ok');
+}
+
+/* Stage 2 Excel */
+async function exportStage2Excel() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  toast('Building Stage 2 Excel…');
+  const wb=new ExcelJS.Workbook(); wb.creator='SnapAudit'; wb.created=new Date();
+  const hf={type:'pattern',pattern:'solid',fgColor:{argb:'FF183934'}};
+  const wsum=wb.addWorksheet('Summary',{tabColor:{argb:'FF183934'}});
+  wsum.mergeCells('A1:B1');const tc=wsum.getCell('A1');tc.value='SnapAudit — Stage 2 Report Summary';tc.fill=hf;tc.font={bold:true,color:{argb:'FFEFC71D'},size:13};tc.alignment={vertical:'middle'};wsum.getRow(1).height=28;
+  [['Site',meta.site||'—'],['Auditor',meta.aud||meta.auditor||'—'],['Date',meta.date||'—'],['Audit Type',meta.type||'—'],['Generated',new Date().toLocaleDateString('en-GB')],['Total Findings',rows.length]].forEach(([k,v],i)=>{wsum.getCell(i+2,1).value=k;wsum.getCell(i+2,1).font={bold:true};wsum.getCell(i+2,2).value=v;});
+  wsum.getColumn(1).width=22;wsum.getColumn(2).width=28;wsum.addRow([]);
+  const srow=wsum.addRow(['Severity','Count']);srow.fill=hf;srow.font={bold:true,color:{argb:'FFEFC71D'}};
+  const cnts={Critical:0,High:0,Medium:0,Low:0};rows.forEach(r=>cnts[r.severity]=(cnts[r.severity]||0)+1);
+  [['Critical','FF7b1818'],['High','FFc0392b'],['Medium','FFd97706'],['Low','FF2e8b57']].forEach(([s,col])=>{const r=wsum.addRow([s,cnts[s]||0]);r.getCell(1).font={bold:true,color:{argb:col}};});
+  const wf=wb.addWorksheet('Findings',{tabColor:{argb:'FFEFC71D'}});
+  const COLS=['ID','Location','Department','Category','Finding Type','Severity','Observation','Action Required','Responsible Person','Target Date','Status','Timestamp'];
+  wf.addRow(COLS).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle',wrapText:true};});wf.getRow(1).height=22;
+  wf.columns=[{width:10},{width:28},{width:18},{width:22},{width:20},{width:12},{width:50},{width:35},{width:22},{width:14},{width:14},{width:22}];
+  const SC={Critical:'FF7b1818',High:'FFc0392b',Medium:'FFd97706',Low:'FF2e8b57'};
+  rows.forEach(r=>{const row=wf.addRow([r.id,r.location,r.department,r.category,r.findingType,r.severity,r.observation,r.actionRequired||'',r.responsiblePerson||'',r.targetDate||'',r.status||'Open',r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'']);row.getCell(6).font={bold:true,color:{argb:SC[r.severity]||'FF000000'}};row.alignment={wrapText:true,vertical:'top'};row.height=36;});
+  wf.autoFilter={from:'A1',to:`${COLS.length},1`};
+  const wa=wb.addWorksheet('Action Plan',{tabColor:{argb:'FF1e6fa8'}});
+  wa.addRow(['Finding ID','Location','Observation','Severity','Action Required','Responsible Person','Target Date','Status']).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle'};});
+  wa.columns=[{width:10},{width:28},{width:45},{width:12},{width:40},{width:22},{width:14},{width:14}];
+  rows.filter(r=>r.status!=='Resolved').forEach(r=>wa.addRow([r.id,r.location,r.observation,r.severity,r.actionRequired||'—',r.responsiblePerson||'—',r.targetDate||'—',r.status||'Open']));
+  const buf=await wb.xlsx.writeBuffer();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download=`SnapAudit-Stage2-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();
+  toast('Stage 2 Excel saved.','ok');
+}
+
+function exportStage2JSON() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  const payload={version:'snapaudit-v1',stage:2,meta,exportedAt:new Date().toISOString(),findings:rows.map(r=>({id:r.id,timestamp:r.timestamp,location:r.location,department:r.department,category:r.category,findingType:r.findingType,severity:r.severity,observation:r.observation,actionRequired:r.actionRequired,responsiblePerson:r.responsiblePerson,targetDate:r.targetDate,status:r.status,photos:r.photos||[]}))};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download=`SnapAudit-Stage2-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  toast('Stage 2 JSON saved.','ok');
+}
+
+/* Full PDF */
+async function exportPDF() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  toast('Building PDF…');
+  const{jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight();
+  const TEAL=[24,57,52],GOLD=[239,199,29];
+  const SC={Critical:[123,24,24],High:[192,57,43],Medium:[217,119,6],Low:[46,139,87]};
+  /* Cover */
+  doc.setFillColor(...TEAL);doc.rect(0,0,W,H,'F');
+  doc.setFillColor(...GOLD);doc.rect(0,H-8,W,8,'F');
+  doc.setTextColor(...GOLD);doc.setFontSize(28);doc.setFont('helvetica','bold');doc.text('SnapAudit',W/2,36,{align:'center'});
+  doc.setTextColor(255,255,255);doc.setFontSize(18);doc.text('HSE Walkaround Audit Report',W/2,50,{align:'center'});
+  doc.setFontSize(12);doc.setFont('helvetica','normal');doc.text('Confidential — For internal use only',W/2,60,{align:'center'});
+  const y0=82;
+  [['Site / Project',meta.site||'—'],['Auditor',meta.aud||meta.auditor||'—'],['Date',meta.date||'—'],['Audit Type',meta.type||'General'],['Generated',new Date().toLocaleDateString('en-GB')],['Total Findings',String(rows.length)]].forEach(([k,v],i)=>{
+    const col=i<3?0:1,ry=y0+(i%3)*16,x=col===0?30:W/2+10;
+    doc.setFillColor(255,255,255,.06);doc.roundedRect(x,ry-6,W/2-40,12,2,2,'F');
+    doc.setTextColor(...GOLD);doc.setFontSize(8);doc.setFont('helvetica','bold');doc.text(k.toUpperCase(),x+4,ry+1);
+    doc.setTextColor(255,255,255);doc.setFontSize(11);doc.setFont('helvetica','normal');doc.text(String(v),x+4,ry+7);
+  });
+  const cnts={Critical:0,High:0,Medium:0,Low:0};rows.forEach(r=>cnts[r.severity]=(cnts[r.severity]||0)+1);
+  const bW=(W-60)/4;
+  [['Critical',SC.Critical],['High',SC.High],['Medium',SC.Medium],['Low',SC.Low]].forEach(([s,col],i)=>{
+    const bx=30+i*(bW+4);doc.setFillColor(...col);doc.roundedRect(bx,y0+52,bW,28,3,3,'F');
+    doc.setTextColor(255,255,255);doc.setFontSize(22);doc.setFont('helvetica','bold');doc.text(String(cnts[s]||0),bx+bW/2,y0+66,{align:'center'});
+    doc.setFontSize(9);doc.setFont('helvetica','normal');doc.text(s,bx+bW/2,y0+75,{align:'center'});
+  });
+  doc.addPage();
+  doc.setTextColor(...TEAL);doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text('Findings — Detailed Report',14,16);
+  doc.setDrawColor(...GOLD);doc.setLineWidth(.5);doc.line(14,18,W-14,18);
+  const hasR=rows.some(r=>r.refined);
+  const head=hasR?[['#','Location','Parameter','Severity','Raw Observation','Refined Note','Recommendation','Legal Reference','Status']]:[['#','Location','Category','Severity','Observation','Action Required','Responsible','Target Date','Status']];
+  const body=rows.map((r,i)=>hasR?[String(i+1),r.location||'',r.parameter||'',r.severity||'',r.observation||'',r.refined||'',r.recommendation||'',r.legal||'',r.status||'Open']:[String(i+1),r.location||'',r.category||'',r.severity||'',r.observation||'',r.actionRequired||'',r.responsiblePerson||'',r.targetDate||'',r.status||'Open']);
+  doc.autoTable({head,body,startY:22,theme:'grid',styles:{fontSize:8,cellPadding:3,valign:'top',lineColor:[220,234,230]},headStyles:{fillColor:TEAL,textColor:GOLD,fontStyle:'bold',fontSize:8.5},columnStyles:{0:{cellWidth:10,halign:'center'},3:{cellWidth:18},8:{cellWidth:18}},didParseCell:d=>{if(d.section==='body'&&d.column.index===3){const s=d.cell.raw;const cs=SC[s]||[85,85,85];d.cell.styles.fillColor=cs.map(x=>x+130>255?255:x+130);d.cell.styles.textColor=cs;d.cell.styles.fontStyle='bold';}},didDrawPage:d=>{doc.setFillColor(...TEAL);doc.rect(0,H-7,W,7,'F');doc.setTextColor(255,255,255);doc.setFontSize(7);doc.text('SnapAudit · Confidential',14,H-2);doc.text(`Page ${d.pageNumber}`,W-14,H-2,{align:'right'});}});
+  const withP=rows.filter(r=>r.photos&&r.photos[0]);
+  if(withP.length){doc.addPage();doc.setTextColor(...TEAL);doc.setFontSize(14);doc.setFont('helvetica','bold');doc.text('Photo Evidence',14,16);doc.setDrawColor(...GOLD);doc.line(14,18,W-14,18);let px=14,py=24,maxH=0;const PH=55,PW=70,gap=6;withP.forEach((r,i)=>{if(px+PW>W-14){px=14;py+=maxH+gap+12;maxH=0;}if(py+PH>H-14){doc.addPage();px=14;py=24;maxH=0;}doc.addImage(r.photos[0],'JPEG',px,py,PW,PH,'','FAST');doc.setFillColor(0,0,0,.4);doc.rect(px,py+PH-10,PW,10,'F');doc.setTextColor(255,255,255);doc.setFontSize(7);doc.text(`${r.id||('#'+(i+1))} · ${(r.location||'').slice(0,28)} · ${r.severity||''}`,px+2,py+PH-3);if(PH>maxH)maxH=PH;px+=PW+gap;});}
+  doc.save(`SnapAudit-Report-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pdf`);
+  toast('PDF saved.','ok');
+}
+
+/* Full Excel */
+async function exportExcel() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  toast('Building Excel…');
+  const wb=new ExcelJS.Workbook();wb.creator='SnapAudit';wb.created=new Date();
+  const hf={type:'pattern',pattern:'solid',fgColor:{argb:'FF183934'}};
+  const wsum=wb.addWorksheet('Summary',{tabColor:{argb:'FF183934'}});
+  wsum.mergeCells('A1:B1');const tc=wsum.getCell('A1');tc.value='SnapAudit — Full Enriched Report Summary';tc.fill=hf;tc.font={bold:true,color:{argb:'FFEFC71D'},size:13};tc.alignment={vertical:'middle'};wsum.getRow(1).height=28;
+  [['Site',meta.site||'—'],['Auditor',meta.aud||meta.auditor||'—'],['Date',meta.date||'—'],['Generated',new Date().toLocaleDateString('en-GB')],['Total Findings',rows.length]].forEach(([k,v],i)=>{wsum.getCell(i+2,1).value=k;wsum.getCell(i+2,1).font={bold:true};wsum.getCell(i+2,2).value=v;});
+  wsum.getColumn(1).width=22;wsum.getColumn(2).width=28;
+  const wf=wb.addWorksheet('Findings',{tabColor:{argb:'FFEFC71D'}});
+  const COLS=['ID','Location','Department','Category','Finding Type','Severity','Status','Observation','Refined Note','Recommendation','Legal Reference','Parameter','Responsible Person','Target Date','Action Required','Timestamp'];
+  wf.addRow(COLS).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle',wrapText:true};});wf.getRow(1).height=22;
+  wf.columns=[{width:10},{width:28},{width:18},{width:22},{width:20},{width:12},{width:14},{width:45},{width:50},{width:50},{width:40},{width:25},{width:22},{width:14},{width:35},{width:22}];
+  const SC2={Critical:'FF7b1818',High:'FFc0392b',Medium:'FFd97706',Low:'FF2e8b57'};
+  rows.forEach(r=>{const row=wf.addRow([r.id,r.location,r.department,r.category,r.findingType,r.severity,r.status||'Open',r.observation,r.refined||'',r.recommendation||'',r.legal||'',r.parameter,r.responsiblePerson||'',r.targetDate||'',r.actionRequired||'',r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'']);row.getCell(6).font={bold:true,color:{argb:SC2[r.severity]||'FF000000'}};row.alignment={wrapText:true,vertical:'top'};row.height=44;});
+  wf.autoFilter={from:'A1',to:`${COLS.length},1`};
+  const wa=wb.addWorksheet('Action Plan',{tabColor:{argb:'FF1e6fa8'}});
+  wa.addRow(['Finding ID','Location','Observation','Severity','Recommendation','Responsible Person','Target Date','Status']).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};});
+  wa.columns=[{width:10},{width:28},{width:45},{width:12},{width:55},{width:22},{width:14},{width:14}];
+  rows.filter(r=>r.status!=='Resolved').forEach(r=>wa.addRow([r.id,r.location,r.observation,r.severity,r.recommendation||'—',r.responsiblePerson||'—',r.targetDate||'—',r.status||'Open']));
+  const buf=await wb.xlsx.writeBuffer();
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download=`SnapAudit-Full-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();
+  toast('Full Excel saved.','ok');
+}
+
+/* PowerPoint */
+async function exportPPT() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  toast('Building PowerPoint…');
+  const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.title='SnapAudit HSE Report';
+  const TEAL='183934',GOLD='EFC71D';
+  const SH={Critical:'7b1818',High:'C0392B',Medium:'D97706',Low:'2E8B57'};
+  const cover=pptx.addSlide();cover.background={color:TEAL};
+  cover.addText('SnapAudit',{x:1,y:0.8,w:11,h:1,fontSize:40,bold:true,color:GOLD,align:'center'});
+  cover.addText('HSE Walkaround Audit Report',{x:1,y:2.0,w:11,h:0.7,fontSize:22,bold:true,color:'FFFFFF',align:'center'});
+  [['Site',meta.site||'—'],['Auditor',meta.aud||meta.auditor||'—'],['Date',meta.date||'—'],['Type',meta.type||'General']].forEach(([k,v],i)=>{const x=i<2?1.5:7.5,y=3.1+(i%2)*.7;cover.addText(`${k}: ${v}`,{x,y,w:4.5,h:.5,fontSize:12,color:'FFFFFF'});});
+  cover.addShape(pptx.ShapeType.rect,{x:0,y:6.8,w:13.33,h:.3,fill:{color:GOLD}});
+  const cnts={Critical:0,High:0,Medium:0,Low:0};rows.forEach(r=>cnts[r.severity]=(cnts[r.severity]||0)+1);
+  const sl=pptx.addSlide();sl.background={color:'F4F8F7'};
+  sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:.8,fill:{color:TEAL}});
+  sl.addText('Summary Dashboard',{x:.3,y:.1,w:12,h:.6,fontSize:18,bold:true,color:GOLD});
+  [['Critical',cnts.Critical,'7b1818'],['High',cnts.High,'C0392B'],['Medium',cnts.Medium,'D97706'],['Low',cnts.Low,'2E8B57']].forEach(([s,n,col],i)=>{const bx=.5+i*3.2;sl.addShape(pptx.ShapeType.roundRect,{x:bx,y:1.1,w:2.8,h:2.2,rectRadius:.1,fill:{color:col}});sl.addText(String(n),{x:bx,y:1.4,w:2.8,h:1.2,fontSize:48,bold:true,color:'FFFFFF',align:'center'});sl.addText(s,{x:bx,y:2.8,w:2.8,h:.4,fontSize:11,color:'FFFFFF',align:'center'});});
+  sl.addText(`Total: ${rows.length} findings`,{x:.5,y:3.6,w:12,h:.5,fontSize:14,bold:true,color:TEAL,align:'center'});
+  const sorted=[...rows].sort((a,b)=>({'Critical':0,'High':1,'Medium':2,'Low':3}[a.severity]||4)-({'Critical':0,'High':1,'Medium':2,'Low':3}[b.severity]||4));
+  sorted.forEach((r,i)=>{
+    const fs=pptx.addSlide();fs.background={color:'FFFFFF'};const sc=SH[r.severity]||'555555';
+    fs.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:.75,fill:{color:TEAL}});
+    fs.addText(`Finding ${String(i+1).padStart(2,'0')} — ${r.severity}`,{x:.3,y:.05,w:10,h:.65,fontSize:16,bold:true,color:GOLD});
+    fs.addText(r.id||'',{x:10.5,y:.1,w:2.5,h:.55,fontSize:10,color:'FFFFFF',align:'right'});
+    fs.addText('📍 '+(r.location||'—'),{x:.3,y:.85,w:9,h:.45,fontSize:12,color:TEAL,bold:true});
+    fs.addShape(pptx.ShapeType.roundRect,{x:9.8,y:.85,w:3.2,h:.4,rectRadius:.05,fill:{color:sc}});
+    fs.addText(r.severity,{x:9.8,y:.87,w:3.2,h:.36,fontSize:11,bold:true,color:'FFFFFF',align:'center'});
+    if(r.refined){fs.addText('Refined Note',{x:.3,y:1.45,w:12,h:.3,fontSize:9,bold:true,color:'888888'});fs.addText(r.refined,{x:.3,y:1.75,w:12.4,h:1.5,fontSize:10,color:'222222',wrap:true});fs.addText('Recommendation',{x:.3,y:3.35,w:12,h:.3,fontSize:9,bold:true,color:'888888'});fs.addText(r.recommendation||'—',{x:.3,y:3.65,w:12.4,h:1.3,fontSize:10,color:'222222',wrap:true});if(r.legal)fs.addText('⚖ '+r.legal,{x:.3,y:5.1,w:12,h:.5,fontSize:8,color:'555555',italic:true});}else{fs.addText('Observation',{x:.3,y:1.4,w:12,h:.3,fontSize:9,bold:true,color:'888888'});fs.addText(r.observation||'—',{x:.3,y:1.7,w:12.4,h:2.2,fontSize:11,color:'222222',wrap:true});if(r.actionRequired)fs.addText('⚡ Action: '+r.actionRequired,{x:.3,y:4.0,w:12,h:.5,fontSize:10,bold:true,color:sc});}
+    fs.addShape(pptx.ShapeType.line,{x:.3,y:6.75,w:12.7,h:0,line:{color:'DDDDDD',width:.5}});
+    fs.addText(`SnapAudit · ${meta.site||'Site'} · ${meta.date||''}`,{x:.3,y:6.82,w:10,h:.28,fontSize:7,color:'AAAAAA'});
+    fs.addText(`${i+1} / ${rows.length}`,{x:11.5,y:6.82,w:1.5,h:.28,fontSize:7,color:'AAAAAA',align:'right'});
+  });
+  await pptx.writeFile({fileName:`SnapAudit-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.pptx`});
+  toast('PowerPoint saved.','ok');
+}
+
+function exportJSON() {
+  if(!rows.length){toast('No findings to export.','warn');return;}
+  const payload={version:'snapaudit-v1',meta,exportedAt:new Date().toISOString(),findings:rows};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
+  a.download=`SnapAudit-Backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  toast('JSON saved.','ok');
+}
+
+/* Import */
+async function importData(payload) {
+  try {
+    if(/\.json$/i.test(payload.name)){const d=JSON.parse(payload.content);rows=d.findings||(Array.isArray(d)?d:[]);}
+    else if(/\.csv$/i.test(payload.name)){rows=csvToRows(payload.content);}
+    rows.forEach(r=>{if(!r.parameter)r.parameter=E.classify(r.observation||'');if(!r.status)r.status='Open';if(!r._v)r._v=0;});
+    persist();renderAll();
+    toast(`Imported ${rows.length} finding${rows.length!==1?'s':''}.`,'ok');
+  }catch(e){toast('Import error: '+e.message,'warn');}
+}
+function csvToRows(text){const lines=text.split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return[];const headers=lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'').toLowerCase());return lines.slice(1).map((line,i)=>{const vals=line.split(',').map(v=>v.trim().replace(/^"|"$/g,''));const r={};headers.forEach((h,j)=>r[h]=vals[j]||'');return{id:r.id||('F'+String(i+1).padStart(3,'0')),location:r.location||'',department:r.department||'',category:r.category||'Other',findingType:r.findingtype||'Unsafe Condition',severity:r.severity||'Medium',observation:r.observation||'',responsiblePerson:r.responsibleperson||'',targetDate:r.targetdate||'',actionRequired:r.actionrequired||'',status:r.status||'Open',photos:[],timestamp:r.timestamp||new Date().toISOString(),parameter:'',_v:0};})}
+
+/* Shell bridge */
+window.addEventListener('message', ev => {
+  const d = ev.data; if (!d || d.__sa !== true) return;
+  const reply = data => { try { ev.source.postMessage({__sa:true,reqId:d.reqId,...data},'*'); } catch {} };
+  if      (d.cmd==='exportStage1Excel') exportStage1Excel();
+  else if (d.cmd==='exportStage1JSON')  exportStage1JSON();
+  else if (d.cmd==='exportStage2Excel') exportStage2Excel();
+  else if (d.cmd==='exportStage2JSON')  exportStage2JSON();
+  else if (d.cmd==='exportPDF')         exportPDF();
+  else if (d.cmd==='exportExcel')       exportExcel();
+  else if (d.cmd==='exportPPT')         exportPPT();
+  else if (d.cmd==='exportJSON')        exportJSON();
+  else if (d.cmd==='importData')        importData(d.payload);
+  else if (d.cmd==='receive') {
+    const p=d.payload; if(!p) return;
+    meta={...meta,...p.meta};
+    rows=(p.findings||[]).map(r=>({...r,status:r.status||'Open',_v:r._v||0,likelihood:r.likelihood||3,consequence:r.consequence||3}));
+    persist(); renderAll(); switchTab('dashboard');
+    toast(`Received ${rows.length} finding${rows.length!==1?'s':''}.`,'ok');
+  }
+});
+
+/* Init */
+loadPersisted();
+renderAll();
+</script>
+</body>
+</html>
