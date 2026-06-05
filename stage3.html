@@ -1170,36 +1170,61 @@ async function exportStage2Excel() {
   toast('Building Stage 2 Excel…');
   const wb=new ExcelJS.Workbook(); wb.creator='SnapAudit'; wb.created=new Date();
   const hf={type:'pattern',pattern:'solid',fgColor:{argb:'FF183934'}};
+  
   const wsum=wb.addWorksheet('Summary',{tabColor:{argb:'FF183934'}});
   wsum.mergeCells('A1:B1');const tc=wsum.getCell('A1');tc.value='SnapAudit — Stage 2 Report Summary';tc.fill=hf;tc.font={bold:true,color:{argb:'FFEFC71D'},size:13};tc.alignment={vertical:'middle'};wsum.getRow(1).height=28;
   [['Site',meta.site||'—'],['Auditor',meta.aud||meta.auditor||'—'],['Date',meta.date||'—'],['Audit Type',meta.type||'—'],['Generated',new Date().toLocaleDateString('en-GB')],['Total Findings',rows.length]].forEach(([k,v],i)=>{wsum.getCell(i+2,1).value=k;wsum.getCell(i+2,1).font={bold:true};wsum.getCell(i+2,2).value=v;});
   wsum.getColumn(1).width=22;wsum.getColumn(2).width=28;wsum.addRow([]);
+  
   const srow=wsum.addRow(['Severity','Count']);srow.fill=hf;srow.font={bold:true,color:{argb:'FFEFC71D'}};
   const cnts={Critical:0,High:0,Medium:0,Low:0};rows.forEach(r=>cnts[r.severity]=(cnts[r.severity]||0)+1);
   [['Critical','FF7b1818'],['High','FFc0392b'],['Medium','FFd97706'],['Low','FF2e8b57']].forEach(([s,col])=>{const r=wsum.addRow([s,cnts[s]||0]);r.getCell(1).font={bold:true,color:{argb:col}};});
+  
   const wf=wb.addWorksheet('Findings',{tabColor:{argb:'FFEFC71D'}});
-  const COLS=['ID','Location','Department','Category','Finding Type','Severity','Observation','Action Required','Responsible Person','Target Date','Status','Timestamp'];
+  
+  // 1. Added 'Photo' to headers after 'Department'
+  const COLS=['ID','Location','Department','Photo','Category','Finding Type','Severity','Observation','Action Required','Responsible Person','Target Date','Status','Timestamp'];
   wf.addRow(COLS).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle',wrapText:true};});wf.getRow(1).height=22;
-  wf.columns=[{width:10},{width:28},{width:18},{width:22},{width:20},{width:12},{width:50},{width:35},{width:22},{width:14},{width:14},{width:22}];
+  
+  // 2. Injected width column for Photo
+  wf.columns=[{width:10},{width:28},{width:18},{width:24},{width:22},{width:20},{width:12},{width:50},{width:35},{width:22},{width:14},{width:14},{width:22}];
   const SC={Critical:'FF7b1818',High:'FFc0392b',Medium:'FFd97706',Low:'FF2e8b57'};
-  rows.forEach(r=>{const row=wf.addRow([r.id,r.location,r.department,r.category,r.findingType,r.severity,r.observation,r.actionRequired||'',r.responsiblePerson||'',r.targetDate||'',r.status||'Open',r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'']);row.getCell(6).font={bold:true,color:{argb:SC[r.severity]||'FF000000'}};row.alignment={wrapText:true,vertical:'top'};row.height=36;});
+  
+  rows.forEach((r, idx)=>{
+    const rowNum = idx + 2;
+    // 3. Inserted empty string '' in the 4th position for the photo
+    const row=wf.addRow([r.id,r.location,r.department,'',r.category,r.findingType,r.severity,r.observation,r.actionRequired||'',r.responsiblePerson||'',r.targetDate||'',r.status||'Open',r.timestamp?new Date(r.timestamp).toLocaleString('en-GB'):'']);
+    
+    // 4. Shifted severity font coloring to column 7 (due to new Photo column)
+    row.getCell(7).font={bold:true,color:{argb:SC[r.severity]||'FF000000'}};
+    row.alignment={wrapText:true,vertical:'top'};
+    
+    // 5. Expand row height
+    row.height=90;
+    
+    // 6. Image Stitching Engine
+    if (r.photos && r.photos[0]) {
+      const base64Data = r.photos[0].replace(/^data:image\/\w+;base64,/, "");
+      const imageId = wb.addImage({ base64: base64Data, extension: 'jpeg' });
+      wf.addImage(imageId, {
+        tl: { col: 3, row: rowNum - 1 }, // Anchors to column D (index 3)
+        ext: { width: 150, height: 105 },
+        editAs: 'oneCell'
+      });
+    }
+  });
+  
   wf.autoFilter={from:'A1',to:`${COLS.length},1`};
+  
   const wa=wb.addWorksheet('Action Plan',{tabColor:{argb:'FF1e6fa8'}});
   wa.addRow(['Finding ID','Location','Observation','Severity','Action Required','Responsible Person','Target Date','Status']).eachCell(c=>{c.fill=hf;c.font={bold:true,color:{argb:'FFEFC71D'}};c.alignment={vertical:'middle'};});
   wa.columns=[{width:10},{width:28},{width:45},{width:12},{width:40},{width:22},{width:14},{width:14}];
   rows.filter(r=>r.status!=='Resolved').forEach(r=>wa.addRow([r.id,r.location,r.observation,r.severity,r.actionRequired||'—',r.responsiblePerson||'—',r.targetDate||'—',r.status||'Open']));
+  
   const buf=await wb.xlsx.writeBuffer();
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
   a.download=`SnapAudit-Stage2-${(meta.site||'Site').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.xlsx`;a.click();
   toast('Stage 2 Excel saved.','ok');
-}
-
-function exportStage2JSON() {
-  if(!rows.length){toast('No findings to export.','warn');return;}
-  const payload={version:'snapaudit-v1',stage:2,meta,exportedAt:new Date().toISOString(),findings:rows.map(r=>({id:r.id,timestamp:r.timestamp,location:r.location,department:r.department,category:r.category,findingType:r.findingType,severity:r.severity,observation:r.observation,actionRequired:r.actionRequired,responsiblePerson:r.responsiblePerson,targetDate:r.targetDate,status:r.status,photos:r.photos||[]}))};
-  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));
-  a.download=`SnapAudit-Stage2-${new Date().toISOString().slice(0,10)}.json`;a.click();
-  toast('Stage 2 JSON saved.','ok');
 }
 
 /* Full PDF */
